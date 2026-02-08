@@ -16,15 +16,42 @@ Real-time terminal dashboard for monitoring multiple Claude Code agent sessions.
 
 Zero dependencies. Pure Node.js.
 
-## Quick Start
+## Installation
 
-### 1. Clone
+### Option A: Plugin Marketplace (Recommended)
+
+Install as a Claude Code plugin — hooks are configured automatically, no manual setup needed.
+
+```bash
+# 1. Add the marketplace
+claude plugin marketplace add Yrzhe/claude-agent-monitor
+
+# 2. Install the plugin
+claude plugin install claude-agent-monitor@claude-agent-monitor
+```
+
+Then launch the dashboard:
+
+```bash
+node ~/.claude/plugins/cache/claude-agent-monitor/claude-agent-monitor/0.1.0/dashboard/bin/cam.js
+```
+
+Or link it globally for a shorter command:
+
+```bash
+cd ~/.claude/plugins/cache/claude-agent-monitor/claude-agent-monitor/0.1.0 && npm link
+cam
+```
+
+### Option B: Manual Setup
+
+#### 1. Clone
 
 ```bash
 git clone https://github.com/Yrzhe/claude-agent-monitor.git ~/claude-agent-monitor
 ```
 
-### 2. Configure hooks
+#### 2. Configure hooks
 
 Add this to your `~/.claude/settings.json` (merge with existing config if needed):
 
@@ -82,7 +109,7 @@ Add this to your `~/.claude/settings.json` (merge with existing config if needed
 }
 ```
 
-### 3. Launch dashboard
+#### 3. Launch dashboard
 
 ```bash
 node ~/claude-agent-monitor/dashboard/bin/cam.js
@@ -95,9 +122,11 @@ cd ~/claude-agent-monitor && npm link
 cam
 ```
 
-### 4. Open Claude Code sessions
+## Usage
 
-Start Claude Code in other terminal windows — the dashboard updates in real-time.
+1. **Terminal A** — Run `cam` to open the dashboard
+2. **Terminal B/C/D** — Start Claude Code sessions as usual
+3. The dashboard updates in real-time as agents work
 
 ## How It Works
 
