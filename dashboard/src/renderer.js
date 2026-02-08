@@ -450,13 +450,21 @@ function renderExpandedTimelineLines(recentTools, conversation, innerWidth, scro
  * @param {boolean} isFocused - Whether this panel is focused.
  * @param {number} scrollOffset - Tool history scroll offset.
  * @param {string} summary - AI or rule-based summary text.
+ * @param {string} topic - AI or rule-based topic text.
  */
-function renderPanel(session, width, config, isFocused, scrollOffset, summary) {
+function renderPanel(session, width, config, isFocused, scrollOffset, summary, topic) {
   const innerWidth = width - 4; // 2 border chars + 2 spaces
   const lines = [];
 
   // Header (top border with name, project, elapsed)
   lines.push(renderPanelHeader(session, innerWidth, isFocused));
+
+  // Topic line: AI-generated or first user message
+  const topicDisplay = topic || session.topic;
+  if (topicDisplay) {
+    const topicText = truncate(topicDisplay, innerWidth - 4);
+    lines.push(renderPanelLine(`${MAGENTA}\u25B8${RESET} ${topicText}`, innerWidth, isFocused));
+  }
 
   // Summary lines (up to 3 lines)
   const summaryLines = renderSummaryLines(summary, innerWidth);
@@ -501,8 +509,9 @@ function renderPanel(session, width, config, isFocused, scrollOffset, summary) {
  * @param {object} uiState - {focusIndex, scrollOffsets}.
  * @param {object} config - Config object.
  * @param {object} summaries - Map of sessionId -> summary text.
+ * @param {object} topics - Map of sessionId -> topic text.
  */
-function render(sessions, uiState, config, summaries) {
+function render(sessions, uiState, config, summaries, topics) {
   const cols = process.stdout.columns || 80;
   if (cols < 60) {
     return `${DIM}Terminal too narrow (need 60+ columns)${RESET}`;
@@ -510,6 +519,7 @@ function render(sessions, uiState, config, summaries) {
 
   const ui = uiState || { focusIndex: 0, scrollOffsets: {} };
   const sums = summaries || {};
+  const tops = topics || {};
   const lines = [];
 
   // Count active sessions
@@ -567,9 +577,10 @@ function render(sessions, uiState, config, summaries) {
       const isFocused = item.originalIndex === ui.focusIndex;
       const scrollOffset = ui.scrollOffsets[session.id] || 0;
       const summary = sums[session.id] || '';
+      const topic = tops[session.id] || '';
 
       const panelLines = renderPanel(
-        session, panelWidth, config, isFocused, scrollOffset, summary
+        session, panelWidth, config, isFocused, scrollOffset, summary, topic
       );
 
       for (const pl of panelLines) {
@@ -612,8 +623,8 @@ function render(sessions, uiState, config, summaries) {
 /**
  * Clear screen and draw the dashboard.
  */
-function draw(sessions, uiState, config, summaries) {
-  const output = render(sessions, uiState, config, summaries);
+function draw(sessions, uiState, config, summaries, topics) {
+  const output = render(sessions, uiState, config, summaries, topics);
   process.stdout.write('\x1b[2J\x1b[H'); // clear screen, move cursor to top
   process.stdout.write(output + '\n');
 }

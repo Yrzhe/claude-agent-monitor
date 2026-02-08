@@ -10,6 +10,7 @@ const { SummaryManager } = require('./summarizer');
 const { runSetup } = require('./setup');
 const { notify, detectTransitions } = require('./notifier');
 const { saveExport } = require('./exporter');
+const { ArchiveSyncer } = require('./archive-sync');
 
 /**
  * Start the dashboard application.
@@ -19,6 +20,9 @@ async function start() {
 
   // Summary manager
   const summaryManager = new SummaryManager(config);
+
+  // Archive syncer — writes conversation + summaries to archive files
+  const archiveSyncer = new ArchiveSyncer();
 
   // Set up raw mode for keyboard input
   if (process.stdin.isTTY) {
@@ -100,15 +104,26 @@ async function start() {
       uiState.focusIndex = currentSessions.length - 1;
     }
 
-    // Gather summaries
+    // Gather summaries and topic summaries
     const summaries = {};
+    const topics = {};
     for (const session of currentSessions) {
       summaries[session.id] = summaryManager.getSummary(session);
+      topics[session.id] = summaryManager.getTopicSummary(session);
+    }
+
+    // Sync conversation + summaries to archive files
+    for (const session of currentSessions) {
+      try {
+        archiveSyncer.sync(session, summaries[session.id], topics[session.id]);
+      } catch {
+        // Archive sync is non-critical
+      }
     }
 
     // Pass expandedPanels to renderer via config (avoids changing render() signature)
     const renderConfig = { ...config, _expandedPanels: uiState.expandedPanels };
-    draw(currentSessions, uiState, renderConfig, summaries);
+    draw(currentSessions, uiState, renderConfig, summaries, topics);
   }
 
   // Wire up async summary updates to trigger re-render

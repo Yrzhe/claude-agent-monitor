@@ -6,6 +6,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/).
 
 ## [Unreleased]
 
+### Added
+- **Real-time session archive**: All session events (tool calls, conversations, summaries, topics) are saved as permanent JSONL files in a user-configured archive directory. Hook scripts write tool_use, session_start, stop, and session_end events in real-time; dashboard syncs conversation messages and AI summaries periodically. Archive files organized as `<archivePath>/YYYY/MM/YYYY-MM-DD-<sessionId>.jsonl`. Cross-midnight sessions handled via `archive-map.json` mapping file. Configure archive path via `[s]` setup wizard.
+- **AI topic summary**: Generates a concise session topic title by sampling conversation messages from beginning, middle, and end (user queries + assistant responses + recent tools), displayed prominently with magenta `▸` prefix in both TUI and web dashboard — instantly see what each agent is working on instead of just a random codename. Falls back to first user message when no API key is configured.
+
 ### Fixed
 - **Critical: hooks never fire** — All hook matchers used `""` (empty string) which matches nothing; changed to `"*"` (wildcard) so hooks actually trigger. Affected `hooks/hooks.json`, `.claude-plugin/plugin.json`, and README manual setup instructions.
 

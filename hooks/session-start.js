@@ -3,6 +3,7 @@
 
 const { execSync } = require('child_process');
 const { readStdin, writeEvent, getAgentName } = require('./lib/shared');
+const { getArchiveBasePath, initArchive } = require('./lib/archiver');
 
 /**
  * Capture tmux pane ID and window info from the current environment.
@@ -37,7 +38,7 @@ async function main() {
   const { session_id, cwd, source, model } = input;
   const tmux = getTmuxInfo();
 
-  writeEvent(session_id, {
+  const event = {
     ts: new Date().toISOString(),
     event: 'session_start',
     session_id,
@@ -47,7 +48,19 @@ async function main() {
     source: source || 'unknown',
     tmux_pane: tmux.tmux_pane,
     tmux_window: tmux.tmux_window,
-  });
+  };
+
+  writeEvent(session_id, event);
+
+  // Archive: create file + mapping
+  try {
+    const basePath = getArchiveBasePath();
+    if (basePath) {
+      initArchive(basePath, event);
+    }
+  } catch {
+    // Silent failure — never disrupt hooks
+  }
 
   process.exit(0);
 }

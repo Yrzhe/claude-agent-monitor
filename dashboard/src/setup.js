@@ -1,5 +1,7 @@
 'use strict';
 
+const os = require('os');
+const path = require('path');
 const { PROVIDERS, DEFAULTS } = require('./config');
 
 // ANSI codes (matching renderer.js style)
@@ -23,6 +25,7 @@ const STEP_API_KEY = 1;
 const STEP_BASE_URL = 2;
 const STEP_MODEL = 3;
 const STEP_LANGUAGE = 4;
+const STEP_ARCHIVE_PATH = 5;
 
 const PROVIDER_NAMES = ['anthropic', 'openai', 'custom'];
 
@@ -38,6 +41,7 @@ function createSetupState(existingConfig) {
     baseUrl: cfg.baseUrl || DEFAULTS.baseUrl,
     model: cfg.model || DEFAULTS.model,
     language: cfg.language || '',
+    archivePath: cfg.archivePath || '',
     // Track if baseUrl/model were manually edited (vs auto-filled from provider)
     baseUrlEdited: false,
     modelEdited: false,
@@ -148,6 +152,17 @@ function renderSetupScreen(state) {
   const langValue = state.language || (state.step !== STEP_LANGUAGE ? `${DIM}(auto)${RESET}` : '');
   lines.push(contentLine(`${langLabel} ${langValue}${langSuffix}${langHint}`));
 
+  // Archive path
+  const archiveLabel = state.step === STEP_ARCHIVE_PATH
+    ? `${WHITE}${BOLD}Archive:${RESET}`
+    : `${DIM}Archive:${RESET}`;
+  const archiveSuffix = state.step === STEP_ARCHIVE_PATH ? `${YELLOW}\u2588${RESET}` : '';
+  const archiveHint = (state.step === STEP_ARCHIVE_PATH && !state.archivePath)
+    ? ` ${DIM}(e.g. ~/claude-archives)${RESET}`
+    : '';
+  const archiveValue = state.archivePath || (state.step !== STEP_ARCHIVE_PATH ? `${DIM}(disabled)${RESET}` : '');
+  lines.push(contentLine(`${archiveLabel} ${archiveValue}${archiveSuffix}${archiveHint}`));
+
   lines.push(emptyLine());
 
   // Footer actions
@@ -224,7 +239,11 @@ function handleSetupKey(key, state) {
   }
 
   if (state.step === STEP_LANGUAGE) {
-    return handleTextInput(key, state, 'language', null);
+    return handleTextInput(key, state, 'language', STEP_ARCHIVE_PATH);
+  }
+
+  if (state.step === STEP_ARCHIVE_PATH) {
+    return handleTextInput(key, state, 'archivePath', null);
   }
 
   return { state, result: 'continue' };
@@ -303,12 +322,18 @@ function runSetup(existingConfig) {
 
       if (result === 'done') {
         cleanup();
+        // Expand ~ in archivePath
+        let archivePath = state.archivePath || '';
+        if (archivePath.startsWith('~')) {
+          archivePath = path.join(os.homedir(), archivePath.slice(1));
+        }
         resolve({
           provider: state.provider,
           apiKey: state.apiKey,
           baseUrl: state.baseUrl,
           model: state.model,
           language: state.language,
+          archivePath,
         });
         return;
       }

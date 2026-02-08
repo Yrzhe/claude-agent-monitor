@@ -2,6 +2,7 @@
 'use strict';
 
 const { readStdin, writeEvent, getAgentName } = require('./lib/shared');
+const { archiveEvent } = require('./lib/archiver');
 
 async function main() {
   const input = await readStdin();
@@ -11,12 +12,16 @@ async function main() {
 
   const { session_id } = input;
 
-  writeEvent(session_id, {
+  const event = {
     ts: new Date().toISOString(),
     event: 'stop',
     session_id,
     agent_name: getAgentName(session_id),
-  });
+  };
+
+  writeEvent(session_id, event);
+
+  try { archiveEvent(session_id, event); } catch { /* silent */ }
 
   process.exit(0);
 }

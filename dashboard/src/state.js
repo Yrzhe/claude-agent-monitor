@@ -83,6 +83,12 @@ function buildSession(events, maxRecentTools) {
   const cwd = startEvent ? startEvent.cwd : '';
   const conversation = loadConversation(sessionId, cwd);
 
+  // Extract the first user message as session topic
+  const firstUserMsg = conversation.find((m) => m.role === 'user');
+  const topic = firstUserMsg
+    ? firstUserMsg.text.replace(/\n/g, ' ').trim()
+    : '';
+
   return {
     id: sessionId,
     name: events[0].agent_name || 'unknown',
@@ -91,6 +97,7 @@ function buildSession(events, maxRecentTools) {
     tmuxPane: startEvent ? (startEvent.tmux_pane || '') : '',
     tmuxWindow: startEvent ? (startEvent.tmux_window || '') : '',
     status: deriveStatus(events, now),
+    topic,
     lastTool: lastToolEvent
       ? `${lastToolEvent.tool_name} ${lastToolEvent.tool_summary}`
       : null,

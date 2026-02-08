@@ -18,6 +18,7 @@ function buildPayload(config, summaryManager) {
   return sessions.map((session) => ({
     ...session,
     summary: summaryManager.getSummary(session),
+    topicSummary: summaryManager.getTopicSummary(session),
     // conversation is already included from state.js
   }));
 }

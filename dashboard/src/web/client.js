@@ -225,6 +225,19 @@ main {
   white-space: nowrap;
 }
 
+/* Topic line */
+.topic-line {
+  font-family: var(--font-mono);
+  font-size: 0.8rem;
+  color: var(--purple);
+  padding: 8px 16px;
+  border-bottom: 1px solid var(--border);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  line-height: 1.4;
+}
+
 /* Card body */
 .card-body { padding: 12px 16px; }
 
@@ -594,6 +607,12 @@ function renderCard(session) {
     }
   }).join('');
 
+  // Topic: AI-generated summary or first user message fallback
+  const topicText = session.topicSummary || session.topic || '';
+  const topicHtml = topicText
+    ? '<div class="topic-line" title="' + esc(session.topic || topicText) + '">&#x25B8; ' + esc(topicText.length > 120 ? topicText.slice(0, 117) + '...' : topicText) + '</div>'
+    : '';
+
   return '<div class="session-card status-' + esc(session.status) + '" data-id="' + esc(session.id) + '">' +
     '<div class="card-header">' +
       '<span class="status-dot ' + esc(session.status) + '"></span>' +
@@ -602,6 +621,7 @@ function renderCard(session) {
       '<span class="agent-project" title="' + esc(session.cwd || '') + '">' + esc(projectName(session.cwd)) + '</span>' +
       '<span class="agent-elapsed">' + formatElapsed(session.lastEventAt) + '</span>' +
     '</div>' +
+    topicHtml +
     '<div class="card-body">' +
       '<div class="summary-text">' + esc(session.summary || '') + '</div>' +
       '<div class="stats-row">' +

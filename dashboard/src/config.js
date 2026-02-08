@@ -30,6 +30,7 @@ const DEFAULTS = {
   maxRecentTools: 10,
   notifications: false,
   groupByProject: false,
+  archivePath: '',
 };
 
 /**
@@ -53,6 +54,7 @@ function loadConfig() {
           : DEFAULTS.maxRecentTools,
       notifications: typeof parsed.notifications === 'boolean' ? parsed.notifications : DEFAULTS.notifications,
       groupByProject: typeof parsed.groupByProject === 'boolean' ? parsed.groupByProject : DEFAULTS.groupByProject,
+      archivePath: typeof parsed.archivePath === 'string' ? parsed.archivePath : DEFAULTS.archivePath,
     };
   } catch {
     return { ...DEFAULTS };
@@ -75,6 +77,7 @@ function saveConfig(config) {
     maxRecentTools: config.maxRecentTools || DEFAULTS.maxRecentTools,
     notifications: !!config.notifications,
     groupByProject: !!config.groupByProject,
+    archivePath: config.archivePath || '',
   };
   fs.writeFileSync(CONFIG_PATH, JSON.stringify(data, null, 2) + '\n', 'utf8');
 }

@@ -87,6 +87,84 @@ function ruleSummary(session) {
 }
 
 /**
+ * Sample conversation messages from beginning, middle, and end.
+ * Picks user + assistant messages for a representative snapshot.
+ * @param {Array} conversation - Array of {role, text, ts}
+ * @returns {Array} sampled messages
+ */
+function sampleConversation(conversation) {
+  if (!conversation || conversation.length === 0) return [];
+
+  // Filter to only user and assistant messages with text
+  const msgs = conversation.filter((m) => m.text && m.text.trim());
+  if (msgs.length <= 6) return msgs; // small enough, use all
+
+  const sampled = [];
+
+  // Beginning: first 2 messages (usually user prompt + assistant response)
+  sampled.push(msgs[0]);
+  if (msgs.length > 1) sampled.push(msgs[1]);
+
+  // Middle: pick 1-2 from the center
+  const midIdx = Math.floor(msgs.length / 2);
+  if (midIdx > 1 && midIdx < msgs.length - 2) {
+    sampled.push(msgs[midIdx]);
+    if (msgs[midIdx + 1]) sampled.push(msgs[midIdx + 1]);
+  }
+
+  // Recent: last 2 messages
+  const tail = msgs.slice(-2);
+  for (const m of tail) {
+    // Avoid duplicates
+    if (!sampled.find((s) => s.ts === m.ts)) {
+      sampled.push(m);
+    }
+  }
+
+  return sampled;
+}
+
+/**
+ * Build the prompt for AI topic summary.
+ * Uses sampled conversation to generate a concise session topic.
+ */
+function buildTopicPrompt(config, session) {
+  const sampled = sampleConversation(session.conversation || []);
+
+  // Include recent tool details for extra context
+  const tools = (session.recentTools || []).slice(0, 5);
+  const toolSnippet = tools.length > 0
+    ? '\n\nRecent tool activity:\n' + tools.map((t) => `- ${t.toolName}: ${t.toolSummary}`).join('\n')
+    : '';
+
+  const msgSection = sampled.length > 0
+    ? sampled.map((m) => {
+        const prefix = m.role === 'user' ? 'User' : 'Assistant';
+        const text = (m.text || '').slice(0, 300);
+        return `${prefix}: ${text}`;
+      }).join('\n')
+    : '(no conversation yet)';
+
+  const langInstruction = config.language
+    ? ` Respond in ${config.language}.`
+    : '';
+
+  return `Given this conversation between a user and a coding agent working in "${session.cwd}":\n\n${msgSection}${toolSnippet}\n\nWrite a very short topic title (under 30 characters, like a browser tab title) that describes what this session is about. Just the topic, no quotes, no punctuation, no explanation.${langInstruction}`;
+}
+
+/**
+ * Rule-based topic fallback: first user message, truncated.
+ */
+function ruleTopicSummary(session) {
+  const firstUser = (session.conversation || []).find((m) => m.role === 'user' && m.text);
+  if (firstUser) {
+    const text = firstUser.text.replace(/\n/g, ' ').trim();
+    return text.length > 60 ? text.slice(0, 57) + '...' : text;
+  }
+  return '';
+}
+
+/**
  * Build the prompt for AI summary.
  */
 function buildPrompt(config, session) {
@@ -205,6 +283,87 @@ function callApi(config, session) {
 }
 
 /**
+ * Call API to generate an AI topic summary.
+ * Same as callApi but uses the pre-built topic prompt from session._topicPrompt.
+ */
+function callTopicApi(config, session) {
+  return new Promise((resolve) => {
+    const prompt = session._topicPrompt;
+    const isAnthropic = config.provider === 'anthropic';
+
+    const body = JSON.stringify({
+      model: config.model,
+      max_tokens: 60,
+      messages: [{ role: 'user', content: prompt }],
+    });
+
+    const parsed = url.parse(config.baseUrl);
+    const isHttps = parsed.protocol === 'https:';
+    const mod = isHttps ? https : http;
+
+    const apiPath = isAnthropic ? '/v1/messages' : '/v1/chat/completions';
+    let basePath = parsed.path || '';
+    if (basePath.endsWith('/v1')) basePath = basePath.slice(0, -3);
+    if (basePath.endsWith('/v1/')) basePath = basePath.slice(0, -4);
+
+    const headers = {
+      'Content-Type': 'application/json',
+      'Content-Length': Buffer.byteLength(body),
+    };
+
+    if (isAnthropic) {
+      headers['x-api-key'] = config.apiKey;
+      headers['anthropic-version'] = '2023-06-01';
+    } else {
+      headers['Authorization'] = `Bearer ${config.apiKey}`;
+    }
+
+    const reqOptions = {
+      hostname: parsed.hostname,
+      port: parsed.port || (isHttps ? 443 : 80),
+      path: basePath + apiPath,
+      method: 'POST',
+      headers,
+      timeout: REQUEST_TIMEOUT_MS,
+    };
+
+    const req = mod.request(reqOptions, (res) => {
+      const chunks = [];
+      res.on('data', (chunk) => chunks.push(chunk));
+      res.on('end', () => {
+        try {
+          const data = JSON.parse(Buffer.concat(chunks).toString());
+          if (isAnthropic) {
+            if (data.content && data.content[0] && data.content[0].text) {
+              resolve(data.content[0].text.trim());
+            } else {
+              resolve(null);
+            }
+          } else {
+            if (data.choices && data.choices[0] && data.choices[0].message) {
+              resolve(data.choices[0].message.content.trim());
+            } else {
+              resolve(null);
+            }
+          }
+        } catch {
+          resolve(null);
+        }
+      });
+    });
+
+    req.on('error', () => resolve(null));
+    req.on('timeout', () => {
+      req.destroy();
+      resolve(null);
+    });
+
+    req.write(body);
+    req.end();
+  });
+}
+
+/**
  * SummaryManager — caches and debounces summaries per session.
  * Uses rule-based fallback, optional AI via configurable provider.
  */
@@ -212,7 +371,9 @@ class SummaryManager {
   constructor(config) {
     this._config = config;
     this._cache = {}; // sessionId -> { text, toolCount, ts }
+    this._topicCache = {}; // sessionId -> { text, msgCount, ts }
     this._pending = new Set(); // sessionIds with in-flight API calls
+    this._topicPending = new Set(); // sessionIds with in-flight topic calls
     this.onUpdate = null; // callback when async summary arrives
   }
 
@@ -249,6 +410,79 @@ class SummaryManager {
     // Return rule-based immediately (or stale cached text while AI loads)
     if (cached && cached.text) return cached.text;
     return ruleSummary(session);
+  }
+
+  /**
+   * Get topic summary for a session (sync). Returns cached AI topic or rule-based.
+   * Triggers async API call if needed.
+   */
+  getTopicSummary(session) {
+    const id = session.id;
+    const cached = this._topicCache[id];
+    const now = Date.now();
+    const msgCount = session.messageCount || 0;
+
+    // Return cached if message count hasn't changed
+    if (cached && cached.msgCount === msgCount && cached.text) {
+      return cached.text;
+    }
+
+    // Trigger async AI refresh if API key is configured
+    if (
+      this._config.apiKey &&
+      !this._topicPending.has(id) &&
+      msgCount > 0 &&
+      (!cached || now - cached.ts >= DEBOUNCE_MS)
+    ) {
+      this._refreshTopic(session);
+    }
+
+    // Return stale cached text while AI loads, or rule-based fallback
+    if (cached && cached.text) return cached.text;
+    return ruleTopicSummary(session);
+  }
+
+  /**
+   * Async: call API and update topic cache.
+   */
+  _refreshTopic(session) {
+    const id = session.id;
+    this._topicPending.add(id);
+
+    // Reuse callApi but with topic prompt
+    const origBuildPrompt = buildPrompt;
+    const topicPrompt = buildTopicPrompt(this._config, session);
+
+    // Create a temporary session-like object with the topic prompt
+    const topicSession = { ...session, _topicPrompt: topicPrompt };
+
+    callTopicApi(this._config, topicSession)
+      .then((text) => {
+        this._topicPending.delete(id);
+        if (text) {
+          this._topicCache[id] = {
+            text,
+            msgCount: session.messageCount || 0,
+            ts: Date.now(),
+          };
+        } else {
+          this._topicCache[id] = {
+            text: ruleTopicSummary(session),
+            msgCount: session.messageCount || 0,
+            ts: Date.now(),
+          };
+        }
+        if (this.onUpdate) this.onUpdate();
+      })
+      .catch(() => {
+        this._topicPending.delete(id);
+        this._topicCache[id] = {
+          text: ruleTopicSummary(session),
+          msgCount: session.messageCount || 0,
+          ts: Date.now(),
+        };
+        if (this.onUpdate) this.onUpdate();
+      });
   }
 
   /**
@@ -289,4 +523,4 @@ class SummaryManager {
   }
 }
 
-module.exports = { SummaryManager, ruleSummary };
+module.exports = { SummaryManager, ruleSummary, ruleTopicSummary };
