@@ -3,14 +3,35 @@
 const { loadAllSessions, clearEndedSessions } = require('./state');
 const { draw } = require('./renderer');
 const { SessionWatcher } = require('./watcher');
-const { loadConfig } = require('./config');
+const { loadConfig, saveConfig } = require('./config');
 const { SummaryManager } = require('./summarizer');
+const { runSetup } = require('./setup');
 
 /**
  * Start the dashboard application.
  */
-function start() {
-  const config = loadConfig();
+async function start() {
+  let config = loadConfig();
+
+  // Summary manager
+  const summaryManager = new SummaryManager(config);
+
+  // Set up raw mode for keyboard input
+  if (process.stdin.isTTY) {
+    process.stdin.setRawMode(true);
+    process.stdin.resume();
+    process.stdin.setEncoding('utf8');
+  }
+
+  // First-run setup: if no API key configured, offer the setup wizard
+  if (!config.apiKey) {
+    const setupResult = await runSetup(config);
+    if (setupResult) {
+      config = { ...config, ...setupResult };
+      saveConfig(config);
+      summaryManager.updateConfig(config);
+    }
+  }
 
   // UI state
   const uiState = {
@@ -18,16 +39,18 @@ function start() {
     scrollOffsets: {},  // sessionId -> number
   };
 
-  // Summary manager
-  const summaryManager = new SummaryManager(config);
-
   // Cached sessions for re-render
   let currentSessions = [];
+
+  // Track whether we're in setup mode (blocks dashboard keys)
+  let inSetup = false;
 
   /**
    * Refresh: load sessions and redraw.
    */
   function refresh() {
+    if (inSetup) return; // Don't redraw dashboard while in setup
+
     currentSessions = loadAllSessions(config);
 
     // Clamp focus index
@@ -63,13 +86,27 @@ function start() {
   // Handle terminal resize
   process.stdout.on('resize', refresh);
 
+  /**
+   * Open the setup screen from the dashboard.
+   */
+  async function openSetup() {
+    inSetup = true;
+    const setupResult = await runSetup(config);
+    if (setupResult) {
+      config = { ...config, ...setupResult };
+      saveConfig(config);
+      summaryManager.updateConfig(config);
+    }
+    inSetup = false;
+    refresh();
+  }
+
   // Keyboard input
   if (process.stdin.isTTY) {
-    process.stdin.setRawMode(true);
-    process.stdin.resume();
-    process.stdin.setEncoding('utf8');
-
     process.stdin.on('data', (key) => {
+      // If we're in setup, don't handle dashboard keys (setup handles its own keys)
+      if (inSetup) return;
+
       const sessions = currentSessions;
 
       switch (key) {
@@ -83,6 +120,9 @@ function start() {
         case 'c':
           clearEndedSessions();
           refresh();
+          return;
+        case 's':
+          openSetup();
           return;
       }
 

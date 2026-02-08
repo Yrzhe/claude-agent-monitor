@@ -87,17 +87,26 @@ function ruleSummary(session) {
 }
 
 /**
- * Call Anthropic API to generate an AI summary.
+ * Build the prompt for AI summary.
+ */
+function buildPrompt(session) {
+  const tools = (session.recentTools || []).slice(0, 10);
+  const toolList = tools
+    .map((t) => `- ${t.toolName}: ${t.toolDetail || t.toolSummary}`)
+    .join('\n');
+
+  return `You are summarizing what a coding agent is doing. Given these recent tool calls for agent "${session.name}" working in project "${session.cwd}":\n\n${toolList}\n\nWrite a 1-2 sentence summary of what the agent is currently doing. Be concise and specific. No markdown.`;
+}
+
+/**
+ * Call API to generate an AI summary.
+ * Detects provider from config to use Anthropic or OpenAI-compatible format.
  * Returns a promise that resolves with summary text or null on failure.
  */
-function callAnthropicApi(config, session) {
+function callApi(config, session) {
   return new Promise((resolve) => {
-    const tools = (session.recentTools || []).slice(0, 10);
-    const toolList = tools
-      .map((t) => `- ${t.toolName}: ${t.toolDetail || t.toolSummary}`)
-      .join('\n');
-
-    const prompt = `You are summarizing what a coding agent is doing. Given these recent tool calls for agent "${session.name}" working in project "${session.cwd}":\n\n${toolList}\n\nWrite a 1-2 sentence summary of what the agent is currently doing. Be concise and specific. No markdown.`;
+    const prompt = buildPrompt(session);
+    const isAnthropic = config.provider === 'anthropic';
 
     const body = JSON.stringify({
       model: config.model,
@@ -109,17 +118,31 @@ function callAnthropicApi(config, session) {
     const isHttps = parsed.protocol === 'https:';
     const mod = isHttps ? https : http;
 
+    // Anthropic uses /messages, others use /chat/completions
+    const apiPath = isAnthropic ? '/v1/messages' : '/v1/chat/completions';
+    // Strip trailing /v1 from baseUrl if present, since we add it in apiPath
+    let basePath = parsed.path || '';
+    if (basePath.endsWith('/v1')) basePath = basePath.slice(0, -3);
+    if (basePath.endsWith('/v1/')) basePath = basePath.slice(0, -4);
+
+    const headers = {
+      'Content-Type': 'application/json',
+      'Content-Length': Buffer.byteLength(body),
+    };
+
+    if (isAnthropic) {
+      headers['x-api-key'] = config.apiKey;
+      headers['anthropic-version'] = '2023-06-01';
+    } else {
+      headers['Authorization'] = `Bearer ${config.apiKey}`;
+    }
+
     const reqOptions = {
       hostname: parsed.hostname,
       port: parsed.port || (isHttps ? 443 : 80),
-      path: '/v1/messages',
+      path: basePath + apiPath,
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'x-api-key': config.apiKey,
-        'anthropic-version': '2023-06-01',
-        'Content-Length': Buffer.byteLength(body),
-      },
+      headers,
       timeout: REQUEST_TIMEOUT_MS,
     };
 
@@ -129,10 +152,20 @@ function callAnthropicApi(config, session) {
       res.on('end', () => {
         try {
           const data = JSON.parse(Buffer.concat(chunks).toString());
-          if (data.content && data.content[0] && data.content[0].text) {
-            resolve(data.content[0].text.trim());
+          if (isAnthropic) {
+            // Anthropic format: content[0].text
+            if (data.content && data.content[0] && data.content[0].text) {
+              resolve(data.content[0].text.trim());
+            } else {
+              resolve(null);
+            }
           } else {
-            resolve(null);
+            // OpenAI format: choices[0].message.content
+            if (data.choices && data.choices[0] && data.choices[0].message) {
+              resolve(data.choices[0].message.content.trim());
+            } else {
+              resolve(null);
+            }
           }
         } catch {
           resolve(null);
@@ -153,7 +186,7 @@ function callAnthropicApi(config, session) {
 
 /**
  * SummaryManager — caches and debounces summaries per session.
- * Uses rule-based fallback, optional AI via Anthropic API.
+ * Uses rule-based fallback, optional AI via configurable provider.
  */
 class SummaryManager {
   constructor(config) {
@@ -161,6 +194,13 @@ class SummaryManager {
     this._cache = {}; // sessionId -> { text, toolCount, ts }
     this._pending = new Set(); // sessionIds with in-flight API calls
     this.onUpdate = null; // callback when async summary arrives
+  }
+
+  /**
+   * Update config (e.g. after setup changes).
+   */
+  updateConfig(config) {
+    this._config = config;
   }
 
   /**
@@ -198,7 +238,7 @@ class SummaryManager {
     const id = session.id;
     this._pending.add(id);
 
-    callAnthropicApi(this._config, session)
+    callApi(this._config, session)
       .then((text) => {
         this._pending.delete(id);
         if (text) {

@@ -4,6 +4,21 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/).
 
+## [0.2.1] - 2026-02-08
+
+### Added
+- **Interactive setup wizard**: First-run setup screen when no API key is configured — select provider, enter key, set base URL and model
+- **`[s]` keybinding**: Open setup/settings anytime from the dashboard to change provider or API key
+- **Multi-provider support**: OpenAI, Anthropic, and custom OpenAI-compatible endpoints (DeepSeek, Ollama, etc.)
+- **Provider presets**: Built-in defaults for Anthropic and OpenAI (base URL + model auto-filled)
+- **`saveConfig()`**: Config system can now write back to `config.json`, not just read
+
+### Changed
+- API caller is now provider-aware: uses Anthropic `/messages` format or OpenAI `/chat/completions` format based on config
+- Config format extended with `provider` field (backward compatible — old configs default to `anthropic`)
+- Footer keybindings updated with `[s] Setup` indicator
+- `SummaryManager` gains `updateConfig()` for live config changes without restart
+
 ## [0.2.0] - 2026-02-08
 
 ### Added

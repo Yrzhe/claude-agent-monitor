@@ -326,7 +326,7 @@ function render(sessions, uiState, config, summaries) {
 
   // Footer with keybindings
   const aiLabel = config && config.apiKey ? `${GREEN}AI${RESET}` : `${DIM}rules${RESET}`;
-  const footer = `  [\u2191\u2193] Focus  [j/k] Scroll  [q] Quit  [r] Refresh  [c] Clear ended  ${aiLabel}  `;
+  const footer = `  [\u2191\u2193] Focus  [j/k] Scroll  [s] Setup  [q] Quit  [r] Refresh  [c] Clear  ${aiLabel}  `;
   const footerPadLen = Math.max(0, cols - stripAnsi(footer).length - 2);
   lines.push(
     `${CYAN}${BOX.v}${RESET}${DIM}${footer}${RESET}${' '.repeat(footerPadLen)}${CYAN}${BOX.v}${RESET}`

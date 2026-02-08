@@ -19,7 +19,7 @@ Real-time terminal dashboard for monitoring multiple Claude Code agent sessions.
 │ │  • Bash npm test                                         1m  │ │
 │ └───────────────────────────────────────────────────────────────┘ │
 │                                                                   │
-│  [↑↓] Focus  [j/k] Scroll  [q] Quit  [r] Refresh  [c] Clear    │
+│  [↑↓] Focus  [j/k] Scroll  [s] Setup  [q] Quit  [r] Refresh    │
 └───────────────────────────────────────────────────────────────────┘
 ```
 
@@ -42,13 +42,13 @@ claude plugin install claude-agent-monitor@claude-agent-monitor
 Then launch the dashboard:
 
 ```bash
-node ~/.claude/plugins/cache/claude-agent-monitor/claude-agent-monitor/0.2.0/dashboard/bin/cam.js
+node ~/.claude/plugins/cache/claude-agent-monitor/claude-agent-monitor/0.2.1/dashboard/bin/cam.js
 ```
 
 Or link it globally for a shorter command:
 
 ```bash
-cd ~/.claude/plugins/cache/claude-agent-monitor/claude-agent-monitor/0.2.0 && npm link
+cd ~/.claude/plugins/cache/claude-agent-monitor/claude-agent-monitor/0.2.1 && npm link
 cam
 ```
 
@@ -155,14 +155,40 @@ cd ~/claude-agent-monitor && git pull
 2. **Terminal B/C/D** — Start Claude Code sessions as usual
 3. The dashboard updates in real-time as agents work
 
+## First-Run Setup
+
+On first launch (when no API key is configured), an interactive setup wizard appears:
+
+```
+┌─ CLAUDE AGENT MONITOR ─ Setup ──────────────────────────┐
+│                                                          │
+│  AI summaries require an API key.                        │
+│                                                          │
+│  Provider:                                               │
+│    [1] Anthropic  [2] OpenAI  [3] Custom                │
+│                                                          │
+│  API Key: sk-ant-***...***key█                           │
+│  Base URL: https://api.anthropic.com/v1 (default)       │
+│  Model: claude-haiku-4-5-20251001 (default)             │
+│                                                          │
+│  [Enter] Next  [Esc] Skip                               │
+└──────────────────────────────────────────────────────────┘
+```
+
+- Select a provider (1/2/3) to auto-fill base URL and model defaults
+- Type your API key, then press Enter to advance through each field
+- Press Esc to skip setup and use rule-based summaries instead
+- Press `s` anytime in the dashboard to re-open settings
+
 ## Configuration
 
-Create `~/.claude/agent-monitor/config.json` to customize behavior:
+Config is stored at `~/.claude/agent-monitor/config.json`. You can edit it manually or use the in-app setup (`s` key).
 
 ```json
 {
+  "provider": "anthropic",
   "apiKey": "sk-ant-...",
-  "baseUrl": "https://api.anthropic.com",
+  "baseUrl": "https://api.anthropic.com/v1",
   "model": "claude-haiku-4-5-20251001",
   "maxRecentTools": 10
 }
@@ -170,12 +196,28 @@ Create `~/.claude/agent-monitor/config.json` to customize behavior:
 
 | Field | Default | Description |
 |-------|---------|-------------|
-| `apiKey` | _(empty)_ | Anthropic API key for AI summaries. Omit to use rule-based summaries |
-| `baseUrl` | `https://api.anthropic.com` | API base URL (for proxies or custom endpoints) |
+| `provider` | `anthropic` | Provider name: `anthropic`, `openai`, or `custom` |
+| `apiKey` | _(empty)_ | API key for AI summaries. Omit to use rule-based summaries |
+| `baseUrl` | `https://api.anthropic.com/v1` | API base URL |
 | `model` | `claude-haiku-4-5-20251001` | Model for generating summaries |
 | `maxRecentTools` | `10` | Number of recent tool events to track per session |
 
 All fields are optional. The dashboard works fully without any config file.
+
+### Multi-Provider Support
+
+| Provider | Base URL | Example Models |
+|----------|----------|---------------|
+| Anthropic | `https://api.anthropic.com/v1` | `claude-haiku-4-5-20251001`, `claude-sonnet-4-5-20250929` |
+| OpenAI | `https://api.openai.com/v1` | `gpt-4o-mini`, `gpt-4o` |
+| Custom | _(any OpenAI-compatible endpoint)_ | Depends on provider |
+
+**Custom endpoints** work with any API that follows the OpenAI Chat Completions format (`/v1/chat/completions`), including:
+- DeepSeek API
+- Ollama (local)
+- Together AI
+- OpenRouter
+- Any OpenAI-compatible proxy
 
 ### AI Summaries
 
@@ -215,6 +257,7 @@ Events are written as JSONL to `~/.claude/agent-monitor/sessions/<session_id>.js
 |-----|--------|
 | `↑` / `↓` | Switch focus between agent panels |
 | `j` / `k` | Scroll tool history in focused panel |
+| `s` | Open setup / settings |
 | `q` | Quit dashboard |
 | `r` | Force refresh |
 | `c` | Clear ended sessions |
