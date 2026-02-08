@@ -1,0 +1,30 @@
+{
+  "name": "claude-agent-monitor",
+  "owner": {
+    "name": "yrzhe",
+    "url": "https://x.com/yrzhe_top"
+  },
+  "metadata": {
+    "description": "Real-time dashboard for monitoring multiple Claude Code agent sessions",
+    "version": "0.1.0"
+  },
+  "plugins": [
+    {
+      "name": "claude-agent-monitor",
+      "source": "./",
+      "description": "Real-time dashboard for monitoring multiple Claude Code agents with hooks-based event tracking",
+      "author": {
+        "name": "yrzhe"
+      },
+      "homepage": "https://github.com/Yrzhe/claude-agent-monitor",
+      "repository": "https://github.com/Yrzhe/claude-agent-monitor",
+      "license": "MIT",
+      "keywords": [
+        "monitoring",
+        "dashboard",
+        "hooks",
+        "multi-agent"
+      ]
+    }
+  ]
+}
