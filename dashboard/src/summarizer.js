@@ -89,13 +89,17 @@ function ruleSummary(session) {
 /**
  * Build the prompt for AI summary.
  */
-function buildPrompt(session) {
+function buildPrompt(config, session) {
   const tools = (session.recentTools || []).slice(0, 10);
   const toolList = tools
     .map((t) => `- ${t.toolName}: ${t.toolDetail || t.toolSummary}`)
     .join('\n');
 
-  return `You are summarizing what a coding agent is doing. Given these recent tool calls for agent "${session.name}" working in project "${session.cwd}":\n\n${toolList}\n\nWrite a 1-2 sentence summary of what the agent is currently doing. Be concise and specific. No markdown.`;
+  const langInstruction = config.language
+    ? ` Respond in ${config.language}.`
+    : '';
+
+  return `You are summarizing what a coding agent is doing. Given these recent tool calls for agent "${session.name}" working in project "${session.cwd}":\n\n${toolList}\n\nWrite a 1-2 sentence summary of what the agent is currently doing. Be concise and specific. No markdown.${langInstruction}`;
 }
 
 /**
@@ -105,7 +109,7 @@ function buildPrompt(session) {
  */
 function callApi(config, session) {
   return new Promise((resolve) => {
-    const prompt = buildPrompt(session);
+    const prompt = buildPrompt(config, session);
     const isAnthropic = config.provider === 'anthropic';
 
     const body = JSON.stringify({

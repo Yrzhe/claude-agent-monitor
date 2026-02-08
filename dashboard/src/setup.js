@@ -22,6 +22,7 @@ const STEP_PROVIDER = 0;
 const STEP_API_KEY = 1;
 const STEP_BASE_URL = 2;
 const STEP_MODEL = 3;
+const STEP_LANGUAGE = 4;
 
 const PROVIDER_NAMES = ['anthropic', 'openai', 'custom'];
 
@@ -36,6 +37,7 @@ function createSetupState(existingConfig) {
     apiKey: cfg.apiKey || '',
     baseUrl: cfg.baseUrl || DEFAULTS.baseUrl,
     model: cfg.model || DEFAULTS.model,
+    language: cfg.language || '',
     // Track if baseUrl/model were manually edited (vs auto-filled from provider)
     baseUrlEdited: false,
     modelEdited: false,
@@ -135,6 +137,17 @@ function renderSetupScreen(state) {
     : '';
   lines.push(contentLine(`${modelLabel} ${state.model}${modelSuffix}${modelDefaultHint}`));
 
+  // Language
+  const langLabel = state.step === STEP_LANGUAGE
+    ? `${WHITE}${BOLD}Language:${RESET}`
+    : `${DIM}Language:${RESET}`;
+  const langSuffix = state.step === STEP_LANGUAGE ? `${YELLOW}\u2588${RESET}` : '';
+  const langHint = (state.step === STEP_LANGUAGE && !state.language)
+    ? ` ${DIM}(e.g. English, 中文, 日本語)${RESET}`
+    : '';
+  const langValue = state.language || (state.step !== STEP_LANGUAGE ? `${DIM}(auto)${RESET}` : '');
+  lines.push(contentLine(`${langLabel} ${langValue}${langSuffix}${langHint}`));
+
   lines.push(emptyLine());
 
   // Footer actions
@@ -203,12 +216,15 @@ function handleSetupKey(key, state) {
   }
 
   if (state.step === STEP_MODEL) {
-    // On Enter at model step → done (save)
-    const res = handleTextInput(key, state, 'model', null);
+    const res = handleTextInput(key, state, 'model', STEP_LANGUAGE);
     if (res.state.model !== state.model) {
       res.state = { ...res.state, modelEdited: true };
     }
     return res;
+  }
+
+  if (state.step === STEP_LANGUAGE) {
+    return handleTextInput(key, state, 'language', null);
   }
 
   return { state, result: 'continue' };
@@ -292,6 +308,7 @@ function runSetup(existingConfig) {
           apiKey: state.apiKey,
           baseUrl: state.baseUrl,
           model: state.model,
+          language: state.language,
         });
         return;
       }

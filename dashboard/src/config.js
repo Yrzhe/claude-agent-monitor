@@ -26,6 +26,7 @@ const DEFAULTS = {
   apiKey: '',
   baseUrl: PROVIDERS.anthropic.baseUrl,
   model: PROVIDERS.anthropic.models[0],
+  language: '',
   maxRecentTools: 10,
 };
 
@@ -43,6 +44,7 @@ function loadConfig() {
       apiKey: typeof parsed.apiKey === 'string' ? parsed.apiKey : DEFAULTS.apiKey,
       baseUrl: typeof parsed.baseUrl === 'string' ? parsed.baseUrl : DEFAULTS.baseUrl,
       model: typeof parsed.model === 'string' ? parsed.model : DEFAULTS.model,
+      language: typeof parsed.language === 'string' ? parsed.language : DEFAULTS.language,
       maxRecentTools:
         typeof parsed.maxRecentTools === 'number' && parsed.maxRecentTools > 0
           ? parsed.maxRecentTools
@@ -65,6 +67,7 @@ function saveConfig(config) {
     apiKey: config.apiKey || '',
     baseUrl: config.baseUrl || DEFAULTS.baseUrl,
     model: config.model || DEFAULTS.model,
+    language: config.language || '',
     maxRecentTools: config.maxRecentTools || DEFAULTS.maxRecentTools,
   };
   fs.writeFileSync(CONFIG_PATH, JSON.stringify(data, null, 2) + '\n', 'utf8');
