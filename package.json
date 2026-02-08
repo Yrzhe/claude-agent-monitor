@@ -1,0 +1,33 @@
+{
+  "name": "claude-agent-monitor",
+  "version": "0.1.0",
+  "description": "Real-time dashboard for monitoring multiple Claude Code agents",
+  "author": {
+    "name": "yrzhe",
+    "url": "https://x.com/yrzhe_top"
+  },
+  "license": "MIT",
+  "bin": {
+    "cam": "./dashboard/bin/cam.js"
+  },
+  "keywords": [
+    "claude",
+    "claude-code",
+    "agent",
+    "monitor",
+    "dashboard",
+    "terminal"
+  ],
+  "repository": {
+    "type": "git",
+    "url": ""
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "files": [
+    "hooks/",
+    "dashboard/",
+    ".claude-plugin/"
+  ]
+}
