@@ -114,7 +114,8 @@ function loadAllSessions(config) {
 }
 
 /**
- * Remove JSONL files for ended sessions.
+ * Remove JSONL files for inactive sessions (ended or stale).
+ * Sessions with status 'ended' or 'stale' are no longer doing useful work.
  */
 function clearEndedSessions() {
   if (!fs.existsSync(STATE_DIR)) return 0;
@@ -125,7 +126,7 @@ function clearEndedSessions() {
   for (const file of files) {
     const events = parseJsonlFile(path.join(STATE_DIR, file));
     const session = buildSession(events);
-    if (session && session.status === 'ended') {
+    if (session && (session.status === 'ended' || session.status === 'stale')) {
       try {
         fs.unlinkSync(path.join(STATE_DIR, file));
         cleared++;
