@@ -1,3 +1,13 @@
 node_modules/
 .DS_Store
 *.log
+
+# Sensitive files
+.env
+.env.*
+config.json
+*.pem
+*.key
+*.cert
+*credentials*
+*secret*
