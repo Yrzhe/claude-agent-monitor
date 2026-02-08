@@ -261,7 +261,7 @@ function renderPanelFooter(innerWidth, isFocused) {
 function renderSummaryLines(summary, innerWidth) {
   if (!summary) return [`${DIM}(no summary)${RESET}`];
   const wrapped = wordWrap(summary, innerWidth);
-  const lines = wrapped.slice(0, 3).map((line) => `${DIM}${line}${RESET}`);
+  const lines = wrapped.map((line) => `${DIM}${line}${RESET}`);
   return lines;
 }
 
