@@ -122,6 +122,24 @@ cd ~/claude-agent-monitor && npm link
 cam
 ```
 
+## Updating
+
+The plugin does not auto-update. To get the latest version:
+
+### Plugin Marketplace
+
+```bash
+claude plugin marketplace remove claude-agent-monitor
+claude plugin marketplace add Yrzhe/claude-agent-monitor
+claude plugin install claude-agent-monitor@claude-agent-monitor
+```
+
+### Manual Setup
+
+```bash
+cd ~/claude-agent-monitor && git pull
+```
+
 ## Usage
 
 1. **Terminal A** — Run `cam` to open the dashboard
