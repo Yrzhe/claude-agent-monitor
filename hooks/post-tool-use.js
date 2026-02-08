@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 'use strict';
 
-const { readStdin, writeEvent, getAgentName, summarizeTool } = require('./lib/shared');
+const { readStdin, writeEvent, getAgentName, summarizeTool, detailTool } = require('./lib/shared');
 
 async function main() {
   const input = await readStdin();
@@ -10,14 +10,16 @@ async function main() {
   }
 
   const { session_id, tool_name, tool_input } = input;
+  const name = tool_name || 'unknown';
 
   writeEvent(session_id, {
     ts: new Date().toISOString(),
     event: 'tool_use',
     session_id,
     agent_name: getAgentName(session_id),
-    tool_name: tool_name || 'unknown',
-    tool_summary: summarizeTool(tool_name || 'unknown', tool_input),
+    tool_name: name,
+    tool_summary: summarizeTool(name, tool_input),
+    tool_detail: detailTool(name, tool_input),
   });
 
   process.exit(0);

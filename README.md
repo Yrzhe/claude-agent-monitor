@@ -3,15 +3,24 @@
 Real-time terminal dashboard for monitoring multiple Claude Code agent sessions.
 
 ```
-┌─ CLAUDE AGENT MONITOR ──────────────────── 3 active ─┐
-│                                                       │
-│  ● swift-falcon  my-project  Edit auth.ts         3s  │
-│  ● calm-river    dashboard   Bash npm test        1m  │
-│  ○ bold-hawk     api-server  (idle)               5m  │
-│  ✕ dim-wolf      utils       (ended)             10m  │
-│                                                       │
-│  [q] Quit  [r] Refresh  [c] Clear ended              │
-└───────────────────────────────────────────────────────┘
+┌─ CLAUDE AGENT MONITOR ──────────────────────────────── 2 active ─┐
+│                                                                   │
+│ ┏━ ● swift-falcon ━ my-project ━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 3s ━┓ │
+│ ┃ Editing 2 files (auth.ts, login.ts), ran 1 command            ┃ │
+│ ┃───────────────────────────────────────────────────────────────┃ │
+│ ┃  • Edit auth.ts                                          2s  ┃ │
+│ ┃  • Bash git status                                       5s  ┃ │
+│ ┃  • Read package.json                                    10s  ┃ │
+│ ┗━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┛ │
+│                                                                   │
+│ ┌─ ○ calm-river ─ dashboard ──────────────────────────────── 1m ─┐ │
+│ │ Ran 1 command                                                 │ │
+│ │───────────────────────────────────────────────────────────────│ │
+│ │  • Bash npm test                                         1m  │ │
+│ └───────────────────────────────────────────────────────────────┘ │
+│                                                                   │
+│  [↑↓] Focus  [j/k] Scroll  [q] Quit  [r] Refresh  [c] Clear    │
+└───────────────────────────────────────────────────────────────────┘
 ```
 
 Zero dependencies. Pure Node.js.
@@ -33,13 +42,13 @@ claude plugin install claude-agent-monitor@claude-agent-monitor
 Then launch the dashboard:
 
 ```bash
-node ~/.claude/plugins/cache/claude-agent-monitor/claude-agent-monitor/0.1.0/dashboard/bin/cam.js
+node ~/.claude/plugins/cache/claude-agent-monitor/claude-agent-monitor/0.2.0/dashboard/bin/cam.js
 ```
 
 Or link it globally for a shorter command:
 
 ```bash
-cd ~/.claude/plugins/cache/claude-agent-monitor/claude-agent-monitor/0.1.0 && npm link
+cd ~/.claude/plugins/cache/claude-agent-monitor/claude-agent-monitor/0.2.0 && npm link
 cam
 ```
 
@@ -146,6 +155,38 @@ cd ~/claude-agent-monitor && git pull
 2. **Terminal B/C/D** — Start Claude Code sessions as usual
 3. The dashboard updates in real-time as agents work
 
+## Configuration
+
+Create `~/.claude/agent-monitor/config.json` to customize behavior:
+
+```json
+{
+  "apiKey": "sk-ant-...",
+  "baseUrl": "https://api.anthropic.com",
+  "model": "claude-haiku-4-5-20251001",
+  "maxRecentTools": 10
+}
+```
+
+| Field | Default | Description |
+|-------|---------|-------------|
+| `apiKey` | _(empty)_ | Anthropic API key for AI summaries. Omit to use rule-based summaries |
+| `baseUrl` | `https://api.anthropic.com` | API base URL (for proxies or custom endpoints) |
+| `model` | `claude-haiku-4-5-20251001` | Model for generating summaries |
+| `maxRecentTools` | `10` | Number of recent tool events to track per session |
+
+All fields are optional. The dashboard works fully without any config file.
+
+### AI Summaries
+
+When an API key is configured, the dashboard generates intelligent summaries like:
+> "Implementing JWT authentication by editing auth.ts and running tests"
+
+Without an API key, rule-based summaries are used:
+> "Editing 2 files (auth.ts, login.ts), ran 1 command"
+
+AI summaries are cached for 30 seconds and refreshed when tool activity changes.
+
 ## How It Works
 
 **Hooks** (push model) capture events from each Claude Code session:
@@ -153,13 +194,13 @@ cd ~/claude-agent-monitor && git pull
 | Event | What it captures |
 |-------|-----------------|
 | `SessionStart` | New agent session with cwd, model |
-| `PostToolUse` | Every tool call with smart summary |
+| `PostToolUse` | Every tool call with summary + detailed description |
 | `Stop` | Agent finished responding |
 | `SessionEnd` | Agent session exited |
 
 Events are written as JSONL to `~/.claude/agent-monitor/sessions/<session_id>.jsonl`.
 
-**Dashboard** watches the state directory and renders a live table:
+**Dashboard** watches the state directory and renders panel-based UI:
 
 | Icon | Status | Meaning |
 |------|--------|---------|
@@ -172,6 +213,8 @@ Events are written as JSONL to `~/.claude/agent-monitor/sessions/<session_id>.js
 
 | Key | Action |
 |-----|--------|
+| `↑` / `↓` | Switch focus between agent panels |
+| `j` / `k` | Scroll tool history in focused panel |
 | `q` | Quit dashboard |
 | `r` | Force refresh |
 | `c` | Clear ended sessions |

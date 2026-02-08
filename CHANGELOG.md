@@ -4,6 +4,24 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/).
 
+## [0.2.0] - 2026-02-08
+
+### Added
+- **Panel-based UI**: Each agent gets a bordered panel with status, summary, and tool history (replaces single-line table)
+- **AI-powered summaries**: Optional Anthropic API integration for intelligent session summaries via `~/.claude/agent-monitor/config.json`
+- **Rule-based summaries**: Always-available fallback that groups recent tools into human-readable descriptions
+- **Scrollable navigation**: Arrow keys (↑↓) to switch focus between panels, j/k to scroll tool history within a panel
+- **Enriched hook data**: `tool_detail` field added to tool_use events with longer descriptions (up to 200 chars)
+- **Config system**: `~/.claude/agent-monitor/config.json` for API key, base URL, model, and display settings
+- **Recent tools array**: State layer now tracks last N tool events per session (default 10) instead of just the last one
+- **Terminal resize handling**: Dashboard re-renders on `SIGWINCH`
+- **Scroll indicators**: Shows "▲ N more above" / "▼ N more below" when tool history overflows
+
+### Changed
+- Dashboard renderer completely rewritten from table layout to panel-based layout
+- Focused panel uses bold/bright borders for visual distinction
+- Footer shows new keybindings and AI/rules indicator
+
 ## [0.1.0] - 2026-02-08
 
 ### Added

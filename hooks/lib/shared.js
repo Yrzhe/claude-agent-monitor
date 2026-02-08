@@ -108,10 +108,78 @@ function summarizeTool(toolName, toolInput) {
   }
 }
 
+/**
+ * Extract a longer detail string from tool name and input (up to 200 chars).
+ * Provides richer context than summarizeTool for panel display.
+ */
+function detailTool(toolName, toolInput) {
+  if (!toolInput) return toolName;
+
+  const cap = (str, max) =>
+    str.length > max ? str.slice(0, max - 1) + '\u2026' : str;
+
+  switch (toolName) {
+    case 'Bash': {
+      const cmd = toolInput.command || '';
+      const desc = toolInput.description || '';
+      if (desc) return cap(`${desc} — ${cmd}`, 200);
+      return cap(cmd, 200);
+    }
+    case 'Edit': {
+      const fp = toolInput.file_path || '';
+      const rel = fp.split('/').slice(-3).join('/');
+      const old = (toolInput.old_string || '').split('\n')[0];
+      if (old) return cap(`${rel}: replacing "${old}"`, 200);
+      return cap(rel, 200);
+    }
+    case 'Write': {
+      const fp = toolInput.file_path || '';
+      const rel = fp.split('/').slice(-3).join('/');
+      return cap(`Writing ${rel}`, 200);
+    }
+    case 'Read': {
+      const fp = toolInput.file_path || '';
+      const rel = fp.split('/').slice(-3).join('/');
+      const offset = toolInput.offset ? ` from line ${toolInput.offset}` : '';
+      return cap(`Reading ${rel}${offset}`, 200);
+    }
+    case 'Grep': {
+      const pat = toolInput.pattern || '';
+      const p = toolInput.path || '';
+      const dir = p ? path.basename(p) : 'cwd';
+      return cap(`Searching "${pat}" in ${dir}`, 200);
+    }
+    case 'Glob': {
+      const pat = toolInput.pattern || '';
+      const p = toolInput.path || '';
+      const dir = p ? path.basename(p) : 'cwd';
+      return cap(`Finding ${pat} in ${dir}`, 200);
+    }
+    case 'Task': {
+      const desc = toolInput.description || '';
+      const type = toolInput.subagent_type || '';
+      if (type) return cap(`[${type}] ${desc}`, 200);
+      return cap(desc, 200);
+    }
+    case 'WebSearch': {
+      return cap(`Searching web: "${toolInput.query || ''}"`, 200);
+    }
+    case 'WebFetch': {
+      const prompt = toolInput.prompt || '';
+      const url = toolInput.url || '';
+      if (prompt) return cap(`Fetching ${url} — ${prompt}`, 200);
+      return cap(`Fetching ${url}`, 200);
+    }
+    default:
+      return toolName;
+  }
+}
+
 module.exports = {
   readStdin,
   writeEvent,
   getAgentName,
   summarizeTool,
+  detailTool,
   getStateDir,
 };

@@ -52,15 +52,29 @@ function deriveStatus(events, now) {
 
 /**
  * Build a session summary from its events.
+ * @param {Array} events - Array of parsed event objects.
+ * @param {number} maxRecentTools - Max number of recent tool events to keep.
  */
-function buildSession(events) {
+function buildSession(events, maxRecentTools) {
   if (events.length === 0) return null;
 
+  const max = maxRecentTools || 10;
   const now = Date.now();
   const startEvent = events.find((e) => e.event === 'session_start');
   const toolEvents = events.filter((e) => e.event === 'tool_use');
   const lastEvent = events[events.length - 1];
   const lastToolEvent = toolEvents[toolEvents.length - 1];
+
+  // Build recentTools array (newest first, up to max)
+  const recentTools = toolEvents
+    .slice(-max)
+    .reverse()
+    .map((e) => ({
+      toolName: e.tool_name || 'unknown',
+      toolSummary: e.tool_summary || e.tool_name || 'unknown',
+      toolDetail: e.tool_detail || '',
+      ts: new Date(e.ts).getTime(),
+    }));
 
   return {
     id: events[0].session_id,
@@ -71,6 +85,7 @@ function buildSession(events) {
     lastTool: lastToolEvent
       ? `${lastToolEvent.tool_name} ${lastToolEvent.tool_summary}`
       : null,
+    recentTools,
     lastEventAt: new Date(lastEvent.ts).getTime(),
     toolCount: toolEvents.length,
   };
@@ -79,18 +94,20 @@ function buildSession(events) {
 /**
  * Load all sessions from the state directory.
  * Returns array of session objects sorted by last event time (most recent first).
+ * @param {object} config - Config object with maxRecentTools.
  */
-function loadAllSessions() {
+function loadAllSessions(config) {
   if (!fs.existsSync(STATE_DIR)) {
     return [];
   }
 
+  const maxRecentTools = (config && config.maxRecentTools) || 10;
   const files = fs.readdirSync(STATE_DIR).filter((f) => f.endsWith('.jsonl'));
 
   return files
     .map((file) => {
       const events = parseJsonlFile(path.join(STATE_DIR, file));
-      return buildSession(events);
+      return buildSession(events, maxRecentTools);
     })
     .filter(Boolean)
     .sort((a, b) => b.lastEventAt - a.lastEventAt);
