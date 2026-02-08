@@ -4,6 +4,11 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/).
 
+## [Unreleased]
+
+### Added
+- **`[w]` keybinding**: Press `w` in the TUI dashboard to launch the web dashboard and open it in the browser — web server is automatically started and stopped with the TUI
+
 ## [0.4.0] - 2026-02-09
 
 ### Added

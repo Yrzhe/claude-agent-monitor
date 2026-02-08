@@ -1,6 +1,7 @@
 'use strict';
 
-const { execSync } = require('child_process');
+const { execSync, spawn } = require('child_process');
+const path = require('path');
 const { loadAllSessions, clearEndedSessions } = require('./state');
 const { draw } = require('./renderer');
 const { SessionWatcher } = require('./watcher');
@@ -45,6 +46,10 @@ async function start() {
 
   // Track whether we're in setup mode (blocks dashboard keys)
   let inSetup = false;
+
+  // Web server child process
+  let webProcess = null;
+  const webPort = 3210;
 
   /**
    * Refresh: load sessions and redraw.
@@ -125,6 +130,28 @@ async function start() {
         case 's':
           openSetup();
           return;
+        case 'w': {
+          // Launch web dashboard and open browser
+          if (!webProcess) {
+            const camPath = path.join(__dirname, '..', 'bin', 'cam.js');
+            webProcess = spawn(process.execPath, [camPath, 'web', '--port', String(webPort)], {
+              stdio: 'ignore',
+            });
+            webProcess.on('exit', () => { webProcess = null; });
+            // Give server a moment to bind the port before opening browser
+            setTimeout(() => {
+              try {
+                execSync(`open http://localhost:${webPort}`, { stdio: 'ignore', timeout: 3000 });
+              } catch { /* non-macOS or open unavailable */ }
+            }, 500);
+          } else {
+            // Server already running, just open browser
+            try {
+              execSync(`open http://localhost:${webPort}`, { stdio: 'ignore', timeout: 3000 });
+            } catch { /* non-macOS or open unavailable */ }
+          }
+          return;
+        }
         case '\r': // Enter — jump to focused session's tmux pane
         case '\n': {
           if (sessions.length === 0) return;
@@ -185,6 +212,10 @@ async function start() {
     watcher.stop();
     clearInterval(autoRefreshTimer);
     process.stdout.removeAllListeners('resize');
+    if (webProcess) {
+      webProcess.kill();
+      webProcess = null;
+    }
     if (process.stdin.isTTY) {
       process.stdin.setRawMode(false);
     }
