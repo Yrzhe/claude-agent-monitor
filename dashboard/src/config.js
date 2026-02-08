@@ -28,6 +28,8 @@ const DEFAULTS = {
   model: PROVIDERS.anthropic.models[0],
   language: '',
   maxRecentTools: 10,
+  notifications: false,
+  groupByProject: false,
 };
 
 /**
@@ -49,6 +51,8 @@ function loadConfig() {
         typeof parsed.maxRecentTools === 'number' && parsed.maxRecentTools > 0
           ? parsed.maxRecentTools
           : DEFAULTS.maxRecentTools,
+      notifications: typeof parsed.notifications === 'boolean' ? parsed.notifications : DEFAULTS.notifications,
+      groupByProject: typeof parsed.groupByProject === 'boolean' ? parsed.groupByProject : DEFAULTS.groupByProject,
     };
   } catch {
     return { ...DEFAULTS };
@@ -69,6 +73,8 @@ function saveConfig(config) {
     model: config.model || DEFAULTS.model,
     language: config.language || '',
     maxRecentTools: config.maxRecentTools || DEFAULTS.maxRecentTools,
+    notifications: !!config.notifications,
+    groupByProject: !!config.groupByProject,
   };
   fs.writeFileSync(CONFIG_PATH, JSON.stringify(data, null, 2) + '\n', 'utf8');
 }

@@ -6,6 +6,7 @@ const { SessionWatcher } = require('../watcher');
 const { loadConfig } = require('../config');
 const { SummaryManager } = require('../summarizer');
 const { getHtml } = require('./client');
+const { exportSession } = require('../exporter');
 
 const MAX_SSE_CLIENTS = 50;
 
@@ -17,6 +18,7 @@ function buildPayload(config, summaryManager) {
   return sessions.map((session) => ({
     ...session,
     summary: summaryManager.getSummary(session),
+    // conversation is already included from state.js
   }));
 }
 
@@ -87,6 +89,96 @@ function startWebServer(port) {
       res.end(JSON.stringify({ cleared }));
       // Broadcast updated state
       setTimeout(broadcast, 100);
+      return;
+    }
+
+    // GET /api/export — export a session
+    if (pathname === '/api/export' && req.method === 'GET') {
+      const sessionId = parsedUrl.searchParams.get('sessionId');
+      const format = parsedUrl.searchParams.get('format') || 'json';
+
+      if (!sessionId) {
+        res.writeHead(400, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ error: 'sessionId parameter required' }));
+        return;
+      }
+
+      const sessions = loadAllSessions(config);
+      const session = sessions.find((s) => s.id === sessionId);
+      if (!session) {
+        res.writeHead(404, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ error: 'Session not found' }));
+        return;
+      }
+
+      const summary = summaryManager.getSummary(session);
+      const content = exportSession(session, format, summary);
+
+      const contentTypes = {
+        json: 'application/json',
+        csv: 'text/csv',
+        md: 'text/markdown',
+      };
+      const ct = contentTypes[format] || 'text/plain';
+      const ext = format === 'json' ? 'json' : format === 'csv' ? 'csv' : 'md';
+
+      res.writeHead(200, {
+        'Content-Type': `${ct}; charset=utf-8`,
+        'Content-Disposition': `attachment; filename="${session.name}.${ext}"`,
+      });
+      res.end(content);
+      return;
+    }
+
+    // GET /api/stats — session statistics
+    if (pathname === '/api/stats' && req.method === 'GET') {
+      try {
+        const { computeStats } = require('../stats');
+        const sessions = loadAllSessions(config);
+        const stats = computeStats(sessions);
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify(stats));
+      } catch {
+        res.writeHead(500, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ error: 'Stats module not available' }));
+      }
+      return;
+    }
+
+    // GET /api/timeline — session timeline for replay
+    if (pathname === '/api/timeline' && req.method === 'GET') {
+      const sessionId = parsedUrl.searchParams.get('sessionId');
+      if (!sessionId) {
+        res.writeHead(400, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ error: 'sessionId parameter required' }));
+        return;
+      }
+
+      const sessions = loadAllSessions(config);
+      const session = sessions.find((s) => s.id === sessionId);
+      if (!session) {
+        res.writeHead(404, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ error: 'Session not found' }));
+        return;
+      }
+
+      const { buildTimeline } = require('../timeline');
+      const timeline = buildTimeline(session.recentTools, session.conversation || []);
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ session: { id: session.id, name: session.name, status: session.status }, timeline }));
+      return;
+    }
+
+    // GET /replay — session replay page
+    if (pathname === '/replay' && req.method === 'GET') {
+      try {
+        const { getReplayHtml } = require('./replay');
+        res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
+        res.end(getReplayHtml());
+      } catch {
+        res.writeHead(500, { 'Content-Type': 'text/plain' });
+        res.end('Replay module not available');
+      }
       return;
     }
 

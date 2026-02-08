@@ -3,6 +3,7 @@
 const fs = require('fs');
 const path = require('path');
 const os = require('os');
+const { loadConversation } = require('./transcript');
 
 const STATE_DIR = path.join(os.homedir(), '.claude', 'agent-monitor', 'sessions');
 const STALE_THRESHOLD_MS = 5 * 60 * 1000; // 5 minutes
@@ -77,10 +78,15 @@ function buildSession(events, maxRecentTools) {
       ts: new Date(e.ts).getTime(),
     }));
 
+  // Load conversation from Claude Code transcript
+  const sessionId = events[0].session_id;
+  const cwd = startEvent ? startEvent.cwd : '';
+  const conversation = loadConversation(sessionId, cwd);
+
   return {
-    id: events[0].session_id,
+    id: sessionId,
     name: events[0].agent_name || 'unknown',
-    cwd: startEvent ? startEvent.cwd : '',
+    cwd,
     model: startEvent ? startEvent.model : 'unknown',
     tmuxPane: startEvent ? (startEvent.tmux_pane || '') : '',
     tmuxWindow: startEvent ? (startEvent.tmux_window || '') : '',
@@ -91,6 +97,8 @@ function buildSession(events, maxRecentTools) {
     recentTools,
     lastEventAt: new Date(lastEvent.ts).getTime(),
     toolCount: toolEvents.length,
+    conversation,
+    messageCount: conversation.length,
   };
 }
 

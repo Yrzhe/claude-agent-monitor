@@ -345,6 +345,25 @@ main {
 .tool-WebSearch, .tool-WebFetch { background: #1a3a3a; color: var(--cyan); }
 .tool-default { background: var(--bar-bg); color: var(--text-dim); }
 
+/* Message type badges */
+.tool-user_msg { background: #2a1a2a; color: #d2a8ff; }
+.tool-assistant_msg { background: #1a2a3a; color: var(--cyan); }
+
+/* Message bubble styling */
+.timeline-item.msg-item { border-left-color: var(--purple); }
+.timeline-item.msg-user { border-left-color: #d2a8ff; }
+.timeline-item.msg-assistant { border-left-color: var(--cyan); }
+.timeline-msg-text {
+  font-size: 0.75rem;
+  color: var(--text-dim);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  flex: 1;
+  min-width: 0;
+  font-style: italic;
+}
+
 /* Bar segment colors */
 .seg-Read { background: var(--green); }
 .seg-Edit, .seg-Write { background: var(--orange); }
@@ -373,6 +392,37 @@ main {
   .agent-project { margin-left: 0; max-width: 100%; }
   .stats-row { gap: 8px; }
   .timeline-item { font-size: 0.75rem; }
+}
+
+/* Project group headers */
+.project-group {
+  margin-bottom: 8px;
+}
+.project-group-header {
+  font-family: var(--font-mono);
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--cyan);
+  padding: 8px 16px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  user-select: none;
+}
+.project-group-header:hover { color: var(--text); }
+.project-group-header .group-arrow { transition: transform 0.2s; display: inline-block; }
+.project-group-header .group-arrow.open { transform: rotate(90deg); }
+.project-group-count {
+  font-size: 0.7rem;
+  color: var(--text-muted);
+  font-weight: 400;
+}
+
+/* Child session indentation */
+.session-card.child-session {
+  margin-left: 24px;
+  border-left-width: 2px;
 }
 
 /* Animations */
@@ -503,14 +553,46 @@ function renderCard(session) {
     '<span class="stat-item">' + esc(name) + ' <span class="stat-value">' + count + '</span></span>'
   ).join('');
 
+  // Build unified timeline (tools + messages), sorted newest first
+  const conversation = session.conversation || [];
+  const timelineEntries = [];
+  for (const t of tools) {
+    timelineEntries.push({ type: 'tool', ts: t.ts, data: t });
+  }
+  for (const m of conversation) {
+    timelineEntries.push({
+      type: m.role === 'user' ? 'user_message' : 'assistant_message',
+      ts: m.ts,
+      data: m,
+    });
+  }
+  timelineEntries.sort((a, b) => b.ts - a.ts);
+
   // Timeline items
-  const timelineItems = tools.map((t) =>
-    '<li class="timeline-item">' +
-      '<span class="timeline-time">' + formatElapsed(t.ts) + '</span>' +
-      '<span class="timeline-tool ' + getToolClass(t.toolName) + '">' + esc(t.toolName) + '</span>' +
-      '<span class="timeline-detail" title="' + esc(t.toolDetail || t.toolSummary) + '">' + esc(t.toolSummary || '') + '</span>' +
-    '</li>'
-  ).join('');
+  const timelineItems = timelineEntries.map((entry) => {
+    if (entry.type === 'tool') {
+      const t = entry.data;
+      return '<li class="timeline-item">' +
+        '<span class="timeline-time">' + formatElapsed(t.ts) + '</span>' +
+        '<span class="timeline-tool ' + getToolClass(t.toolName) + '">' + esc(t.toolName) + '</span>' +
+        '<span class="timeline-detail" title="' + esc(t.toolDetail || t.toolSummary) + '">' + esc(t.toolSummary || '') + '</span>' +
+      '</li>';
+    } else if (entry.type === 'user_message') {
+      const m = entry.data;
+      return '<li class="timeline-item msg-item msg-user">' +
+        '<span class="timeline-time">' + formatElapsed(m.ts) + '</span>' +
+        '<span class="timeline-tool tool-user_msg">User</span>' +
+        '<span class="timeline-msg-text" title="' + esc(m.text) + '">' + esc(m.text) + '</span>' +
+      '</li>';
+    } else {
+      const m = entry.data;
+      return '<li class="timeline-item msg-item msg-assistant">' +
+        '<span class="timeline-time">' + formatElapsed(m.ts) + '</span>' +
+        '<span class="timeline-tool tool-assistant_msg">Assistant</span>' +
+        '<span class="timeline-msg-text" title="' + esc(m.text) + '">' + esc(m.text) + '</span>' +
+      '</li>';
+    }
+  }).join('');
 
   return '<div class="session-card status-' + esc(session.status) + '" data-id="' + esc(session.id) + '">' +
     '<div class="card-header">' +
@@ -531,7 +613,7 @@ function renderCard(session) {
       '<div class="tool-timeline">' +
         '<button class="timeline-toggle" data-session="' + esc(session.id) + '">' +
           '<span class="arrow' + (isExpanded ? ' open' : '') + '">&#x25B6;</span> ' +
-          'Tool Timeline (' + tools.length + ')' +
+          'Activity Timeline (' + timelineEntries.length + ')' +
         '</button>' +
         '<ul class="timeline-list' + (isExpanded ? ' open' : '') + '">' +
           timelineItems +
@@ -558,8 +640,33 @@ function renderSessions(sessions) {
 
   emptyState.style.display = 'none';
 
-  // Build new HTML
-  const html = sessions.map(renderCard).join('');
+  // Build new HTML - group by project if multiple projects exist
+  const projects = {};
+  for (const s of sessions) {
+    const proj = projectName(s.cwd) || 'unknown';
+    if (!projects[proj]) projects[proj] = [];
+    projects[proj].push(s);
+  }
+  const projectKeys = Object.keys(projects);
+  const useGrouping = projectKeys.length > 1;
+
+  let html;
+  if (useGrouping) {
+    html = projectKeys.map(proj => {
+      const groupSessions = projects[proj];
+      const cards = groupSessions.map(renderCard).join('');
+      return '<div class="project-group">' +
+        '<div class="project-group-header">' +
+          '<span class="group-arrow open">&#x25B6;</span>' +
+          esc(proj) +
+          '<span class="project-group-count">(' + groupSessions.length + ')</span>' +
+        '</div>' +
+        '<div class="project-group-body">' + cards + '</div>' +
+      '</div>';
+    }).join('');
+  } else {
+    html = sessions.map(renderCard).join('');
+  }
 
   // Only update if changed (avoid flicker)
   const tempDiv = document.createElement('div');
@@ -568,6 +675,8 @@ function renderSessions(sessions) {
   // Replace content (keep empty state element)
   const existingCards = container.querySelectorAll('.session-card');
   existingCards.forEach(c => c.remove());
+  const existingGroups = container.querySelectorAll('.project-group');
+  existingGroups.forEach(g => g.remove());
 
   while (tempDiv.firstChild) {
     container.appendChild(tempDiv.firstChild);

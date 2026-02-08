@@ -8,6 +8,8 @@ const { SessionWatcher } = require('./watcher');
 const { loadConfig, saveConfig } = require('./config');
 const { SummaryManager } = require('./summarizer');
 const { runSetup } = require('./setup');
+const { notify, detectTransitions } = require('./notifier');
+const { saveExport } = require('./exporter');
 
 /**
  * Start the dashboard application.
@@ -39,10 +41,15 @@ async function start() {
   const uiState = {
     focusIndex: 0,
     scrollOffsets: {},  // sessionId -> number
+    filter: 'all',     // 'all' | 'active' | 'idle' | 'ended'
+    expandedPanels: new Set(), // sessionIds with expanded tool details
+    notifications: config.notifications || false,
+    groupByProject: config.groupByProject || false,
   };
 
   // Cached sessions for re-render
   let currentSessions = [];
+  let previousSessions = []; // For notification transition detection
 
   // Track whether we're in setup mode (blocks dashboard keys)
   let inSetup = false;
@@ -57,7 +64,34 @@ async function start() {
   function refresh() {
     if (inSetup) return; // Don't redraw dashboard while in setup
 
-    currentSessions = loadAllSessions(config);
+    const allSessions = loadAllSessions(config);
+
+    // Detect transitions for notifications before updating currentSessions
+    if (uiState.notifications && previousSessions.length > 0) {
+      const transitions = detectTransitions(previousSessions, allSessions);
+      for (const t of transitions) {
+        const name = t.session.name || 'Agent';
+        if (t.type === 'session_end') {
+          notify('Agent Finished', `${name} has completed its session`);
+        } else if (t.type === 'became_idle') {
+          notify('Agent Idle', `${name} is waiting for input`);
+        } else if (t.type === 'became_stale') {
+          notify('Agent Stale', `${name} has been unresponsive for 5+ minutes`);
+        }
+      }
+    }
+    previousSessions = allSessions;
+
+    // Apply status filter
+    if (uiState.filter === 'all') {
+      currentSessions = allSessions;
+    } else if (uiState.filter === 'active') {
+      currentSessions = allSessions.filter((s) => s.status === 'active' || s.status === 'idle');
+    } else if (uiState.filter === 'idle') {
+      currentSessions = allSessions.filter((s) => s.status === 'idle' || s.status === 'stale');
+    } else if (uiState.filter === 'ended') {
+      currentSessions = allSessions.filter((s) => s.status === 'ended');
+    }
 
     // Clamp focus index
     if (currentSessions.length === 0) {
@@ -72,7 +106,9 @@ async function start() {
       summaries[session.id] = summaryManager.getSummary(session);
     }
 
-    draw(currentSessions, uiState, config, summaries);
+    // Pass expandedPanels to renderer via config (avoids changing render() signature)
+    const renderConfig = { ...config, _expandedPanels: uiState.expandedPanels };
+    draw(currentSessions, uiState, renderConfig, summaries);
   }
 
   // Wire up async summary updates to trigger re-render
@@ -130,6 +166,58 @@ async function start() {
         case 's':
           openSetup();
           return;
+        case 'n': {
+          // Toggle desktop notifications
+          uiState.notifications = !uiState.notifications;
+          config.notifications = uiState.notifications;
+          saveConfig(config);
+          refresh();
+          return;
+        }
+        case 'f': {
+          // Cycle status filter: All → Active → Idle → Ended → All
+          const filters = ['all', 'active', 'idle', 'ended'];
+          const idx = filters.indexOf(uiState.filter);
+          uiState.filter = filters[(idx + 1) % filters.length];
+          refresh();
+          return;
+        }
+        case ' ': {
+          // Toggle expand/collapse tool details for focused session
+          if (sessions.length === 0) return;
+          const focused = sessions[uiState.focusIndex];
+          if (!focused) return;
+          if (uiState.expandedPanels.has(focused.id)) {
+            uiState.expandedPanels.delete(focused.id);
+          } else {
+            uiState.expandedPanels.add(focused.id);
+          }
+          refresh();
+          return;
+        }
+        case 'e': {
+          // Export focused session as markdown
+          if (sessions.length === 0) return;
+          const focusedSession = sessions[uiState.focusIndex];
+          if (!focusedSession) return;
+          const summary = summaryManager.getSummary(focusedSession);
+          try {
+            const exportPath = saveExport(focusedSession, 'md', summary);
+            // Brief notification via terminal title
+            process.stdout.write(`\x1b]0;Exported to ${path.basename(exportPath)}\x07`);
+          } catch {
+            // Export failed — non-critical
+          }
+          return;
+        }
+        case 'g': {
+          // Toggle project grouping
+          uiState.groupByProject = !uiState.groupByProject;
+          config.groupByProject = uiState.groupByProject;
+          saveConfig(config);
+          refresh();
+          return;
+        }
         case 'w': {
           // Launch web dashboard and open browser
           if (!webProcess) {

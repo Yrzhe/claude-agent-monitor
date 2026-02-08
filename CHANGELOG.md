@@ -4,6 +4,31 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/).
 
+## [0.5.0] - 2026-02-09
+
+### Added
+- **Conversation capture**: Reads Claude Code transcript files (`~/.claude/projects/`) to display user and assistant messages alongside tool calls — full conversation context without new hooks
+- **Unified timeline**: Tools and messages are merged into a single chronological timeline in both TUI and web dashboard
+- **`[n]` keybinding**: Toggle macOS desktop notifications for session transitions (ended, idle, stale)
+- **`[f]` keybinding**: Cycle status filter (All → Active → Idle → Ended) to focus on specific session states
+- **`[Space]` keybinding**: Expand/collapse focused panel to show tool detail + result (2-line entries, 10 visible)
+- **`[e]` keybinding**: Export focused session to Markdown file in `~/.claude/agent-monitor/exports/`
+- **`[g]` keybinding**: Toggle project grouping — sessions grouped by working directory with collapsible headers
+- **`cam export`**: CLI subcommand to export sessions — `cam export [sessionId] [--format json|csv|md]`
+- **`cam stats`**: CLI subcommand showing aggregate statistics — total sessions, tool distribution, project breakdown
+- **Session replay**: `/replay?sessionId=...` web page with play/pause/step controls and keyboard shortcuts (Space, ←→, +/-)
+- **REST API extensions**: `GET /api/export`, `GET /api/stats`, `GET /api/timeline`, `GET /replay`
+- **Parent-child detection**: Temporal correlation to link Task-spawned sub-agent sessions to their parent
+- **Project grouping**: Group sessions by project in both TUI (with `▸` headers) and web (collapsible groups)
+- **Message styling**: User messages shown with `U:` prefix (magenta), assistant with `A:` prefix (cyan) in TUI; speech-bubble styling in web
+- **AI summary context**: Last 3-5 conversation messages appended to AI summary prompt for richer context
+
+### Changed
+- Timeline shows interleaved tools + messages instead of tools only
+- Footer updated with all new keybinding indicators (`[f] Filter`, `[n] Notify`, `[g] Group`, `[e] Export`, `[Space] Expand`)
+- Config extended with `notifications` and `groupByProject` boolean fields
+- Web dashboard shows "Activity Timeline" with message entries alongside tool entries
+
 ## [Unreleased]
 
 ### Added

@@ -101,11 +101,21 @@ function buildPrompt(config, session) {
     })
     .join('\n');
 
+  // Include recent conversation messages for context
+  const messages = (session.conversation || []).slice(-5);
+  const msgSection = messages.length > 0
+    ? '\n\nRecent conversation:\n' + messages.map((m) => {
+        const prefix = m.role === 'user' ? 'User' : 'Assistant';
+        const text = (m.text || '').slice(0, 200);
+        return `- ${prefix}: ${text}`;
+      }).join('\n')
+    : '';
+
   const langInstruction = config.language
     ? ` Respond in ${config.language}.`
     : '';
 
-  return `You are summarizing what a coding agent is doing. Given these recent tool calls for agent "${session.name}" working in project "${session.cwd}":\n\n${toolList}\n\nWrite a 1-2 sentence summary of what the agent is currently doing. Be concise and specific. No markdown.${langInstruction}`;
+  return `You are summarizing what a coding agent is doing. Given these recent tool calls for agent "${session.name}" working in project "${session.cwd}":\n\n${toolList}${msgSection}\n\nWrite a 1-2 sentence summary of what the agent is currently doing. Be concise and specific. No markdown.${langInstruction}`;
 }
 
 /**
