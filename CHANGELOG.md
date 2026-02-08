@@ -4,6 +4,23 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/).
 
+## [0.4.0] - 2026-02-09
+
+### Added
+- **Web Dashboard**: `cam web [--port PORT]` launches an HTTP server for browser-based monitoring (default port 3210)
+- **SSE real-time streaming**: Browser receives live session updates via Server-Sent Events — no manual refresh needed
+- **Session cards**: Dark-themed card layout with status indicator, agent name, model, project path, and elapsed time
+- **Tool call timeline**: Expandable per-session tool history with timestamps, tool type badges, and detail summaries
+- **Tool distribution bar**: Pure CSS stacked bar showing tool type breakdown per session
+- **Session statistics**: Tool count, duration, and per-type counts displayed in each card
+- **REST API**: `GET /api/sessions` (JSON snapshot), `POST /api/clear` (remove ended sessions), `GET /api/events` (SSE stream)
+- **Responsive layout**: Mobile-friendly design with CSS Grid/Flexbox
+- **Connection indicator**: Green/red dot showing SSE connection health
+
+### Changed
+- CLI entry point (`cam.js`) now parses subcommands — `cam` for TUI, `cam web` for web dashboard
+- Existing TUI behavior is completely preserved when no subcommand is given
+
 ## [0.3.0] - 2026-02-08
 
 ### Added
