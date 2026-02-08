@@ -12,6 +12,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/).
 
 ### Fixed
 - **Critical: hooks never fire** — All hook matchers used `""` (empty string) which matches nothing; changed to `"*"` (wildcard) so hooks actually trigger. Affected `hooks/hooks.json`, `.claude-plugin/plugin.json`, and README manual setup instructions.
+- **Critical: archive never writes** — `archivePath` with wrapping quotes (e.g. pasted from terminal as `'/path/to/dir'`) was treated as a relative path, causing all archive writes to silently fail. Fixed in both `archiver.js` (strips wrapping quotes on read) and `setup.js` (strips quotes before saving).
 
 ## [0.5.0] - 2026-02-09
 

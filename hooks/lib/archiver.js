@@ -15,8 +15,15 @@ function getArchiveBasePath() {
   try {
     const raw = fs.readFileSync(CONFIG_PATH, 'utf8');
     const parsed = JSON.parse(raw);
-    const archivePath = parsed.archivePath || '';
+    let archivePath = (parsed.archivePath || '').trim();
     if (!archivePath) return '';
+    // Strip wrapping quotes (single or double) that may have been saved by mistake
+    if (
+      (archivePath.startsWith("'") && archivePath.endsWith("'")) ||
+      (archivePath.startsWith('"') && archivePath.endsWith('"'))
+    ) {
+      archivePath = archivePath.slice(1, -1);
+    }
     // Expand ~ to home directory
     if (archivePath.startsWith('~')) {
       return path.join(os.homedir(), archivePath.slice(1));

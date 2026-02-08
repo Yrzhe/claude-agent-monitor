@@ -322,8 +322,15 @@ function runSetup(existingConfig) {
 
       if (result === 'done') {
         cleanup();
-        // Expand ~ in archivePath
-        let archivePath = state.archivePath || '';
+        // Clean and expand archivePath
+        let archivePath = (state.archivePath || '').trim();
+        // Strip wrapping quotes from paste (e.g. '/path/to/dir' or "/path/to/dir")
+        if (
+          (archivePath.startsWith("'") && archivePath.endsWith("'")) ||
+          (archivePath.startsWith('"') && archivePath.endsWith('"'))
+        ) {
+          archivePath = archivePath.slice(1, -1);
+        }
         if (archivePath.startsWith('~')) {
           archivePath = path.join(os.homedir(), archivePath.slice(1));
         }
