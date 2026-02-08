@@ -4,6 +4,11 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/).
 
+## [Unreleased]
+
+### Fixed
+- **Critical: hooks never fire** — All hook matchers used `""` (empty string) which matches nothing; changed to `"*"` (wildcard) so hooks actually trigger. Affected `hooks/hooks.json`, `.claude-plugin/plugin.json`, and README manual setup instructions.
+
 ## [0.5.0] - 2026-02-09
 
 ### Added
@@ -28,11 +33,6 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/).
 - Footer updated with all new keybinding indicators (`[f] Filter`, `[n] Notify`, `[g] Group`, `[e] Export`, `[Space] Expand`)
 - Config extended with `notifications` and `groupByProject` boolean fields
 - Web dashboard shows "Activity Timeline" with message entries alongside tool entries
-
-## [Unreleased]
-
-### Added
-- **`[w]` keybinding**: Press `w` in the TUI dashboard to launch the web dashboard and open it in the browser — web server is automatically started and stopped with the TUI
 
 ## [0.4.0] - 2026-02-09
 

@@ -69,7 +69,7 @@ Add this to your `~/.claude/settings.json` (merge with existing config if needed
   "hooks": {
     "SessionStart": [
       {
-        "matcher": "",
+        "matcher": "*",
         "hooks": [
           {
             "type": "command",
@@ -80,7 +80,7 @@ Add this to your `~/.claude/settings.json` (merge with existing config if needed
     ],
     "PostToolUse": [
       {
-        "matcher": "",
+        "matcher": "*",
         "hooks": [
           {
             "type": "command",
@@ -92,7 +92,7 @@ Add this to your `~/.claude/settings.json` (merge with existing config if needed
     ],
     "Stop": [
       {
-        "matcher": "",
+        "matcher": "*",
         "hooks": [
           {
             "type": "command",
@@ -104,7 +104,7 @@ Add this to your `~/.claude/settings.json` (merge with existing config if needed
     ],
     "SessionEnd": [
       {
-        "matcher": "",
+        "matcher": "*",
         "hooks": [
           {
             "type": "command",
