@@ -110,6 +110,8 @@ function loadAllSessions(config) {
       return buildSession(events, maxRecentTools);
     })
     .filter(Boolean)
+    // Hide ghost sessions: stale/ended with zero tool events
+    .filter((s) => s.toolCount > 0 || s.status === 'active' || s.status === 'idle')
     .sort((a, b) => b.lastEventAt - a.lastEventAt);
 }
 

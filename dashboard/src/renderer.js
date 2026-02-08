@@ -30,18 +30,59 @@ const BOX = {
 };
 
 /**
- * Strip ANSI escape codes to get visible length.
+ * Check if a Unicode code point is full-width (occupies 2 terminal columns).
+ * Covers CJK Unified Ideographs, Hiragana, Katakana, Hangul, fullwidth forms, etc.
+ */
+function isFullWidth(code) {
+  return (
+    (code >= 0x1100 && code <= 0x115F) ||   // Hangul Jamo
+    (code >= 0x2E80 && code <= 0x303E) ||   // CJK Radicals, Kangxi, Symbols
+    (code >= 0x3040 && code <= 0x33BF) ||   // Hiragana, Katakana, CJK Compat
+    (code >= 0x3400 && code <= 0x4DBF) ||   // CJK Extension A
+    (code >= 0x4E00 && code <= 0x9FFF) ||   // CJK Unified Ideographs
+    (code >= 0xA000 && code <= 0xA4CF) ||   // Yi
+    (code >= 0xAC00 && code <= 0xD7AF) ||   // Hangul Syllables
+    (code >= 0xF900 && code <= 0xFAFF) ||   // CJK Compat Ideographs
+    (code >= 0xFE30 && code <= 0xFE4F) ||   // CJK Compat Forms
+    (code >= 0xFF01 && code <= 0xFF60) ||   // Fullwidth Forms
+    (code >= 0xFFE0 && code <= 0xFFE6) ||   // Fullwidth Signs
+    (code >= 0x20000 && code <= 0x2FA1F)    // CJK Extension B-F
+  );
+}
+
+/**
+ * Calculate display width of a string in terminal columns.
+ * CJK characters = 2 columns, ASCII = 1 column.
+ */
+function displayWidth(str) {
+  let width = 0;
+  for (const ch of str) {
+    const code = ch.codePointAt(0);
+    width += isFullWidth(code) ? 2 : 1;
+  }
+  return width;
+}
+
+/**
+ * Strip ANSI escape codes to get visible text.
  */
 function stripAnsi(str) {
   return str.replace(/\x1b\[[0-9;]*m/g, '');
 }
 
 /**
- * Pad a string (possibly containing ANSI codes) to a visible width.
+ * Get the display width of a string, stripping ANSI codes first.
+ */
+function visibleWidth(str) {
+  return displayWidth(stripAnsi(str));
+}
+
+/**
+ * Pad a string (possibly containing ANSI codes) to a visible column width.
  */
 function padEndVisible(str, width) {
-  const visibleLen = stripAnsi(str).length;
-  const padding = Math.max(0, width - visibleLen);
+  const vw = visibleWidth(str);
+  const padding = Math.max(0, width - vw);
   return str + ' '.repeat(padding);
 }
 
@@ -60,12 +101,21 @@ function formatElapsed(timestampMs) {
 }
 
 /**
- * Truncate string to max length, adding ellipsis if needed.
+ * Truncate string to fit within maxCols display columns, adding ellipsis if needed.
  */
-function truncate(str, maxLen) {
+function truncate(str, maxCols) {
   if (!str) return '';
-  if (str.length <= maxLen) return str;
-  return str.slice(0, maxLen - 1) + '\u2026';
+  if (displayWidth(str) <= maxCols) return str;
+
+  let width = 0;
+  let i = 0;
+  for (const ch of str) {
+    const cw = isFullWidth(ch.codePointAt(0)) ? 2 : 1;
+    if (width + cw + 1 > maxCols) break; // +1 for ellipsis
+    width += cw;
+    i += ch.length; // handle surrogate pairs
+  }
+  return str.slice(0, i) + '\u2026';
 }
 
 /**
@@ -77,25 +127,62 @@ function projectName(cwd) {
 }
 
 /**
- * Simple word-wrap: splits text into lines that fit within maxWidth.
+ * Word-wrap text to fit within maxCols display columns.
+ * Handles CJK text (no spaces) by breaking at character boundaries.
  */
-function wordWrap(text, maxWidth) {
+function wordWrap(text, maxCols) {
   if (!text) return [''];
-  const words = text.split(/\s+/);
-  const lines = [];
-  let current = '';
 
-  for (const word of words) {
-    if (!current) {
-      current = word;
-    } else if (current.length + 1 + word.length <= maxWidth) {
-      current += ' ' + word;
+  const words = text.split(/(\s+)/); // keep whitespace tokens
+  const lines = [];
+  let currentLine = '';
+  let currentWidth = 0;
+
+  for (const token of words) {
+    // Skip pure whitespace tokens between words
+    if (/^\s+$/.test(token)) {
+      if (currentWidth > 0 && currentWidth + 1 <= maxCols) {
+        currentLine += ' ';
+        currentWidth += 1;
+      }
+      continue;
+    }
+
+    const tokenWidth = displayWidth(token);
+
+    // If token fits on current line
+    if (currentWidth + tokenWidth <= maxCols) {
+      currentLine += token;
+      currentWidth += tokenWidth;
+      continue;
+    }
+
+    // Token doesn't fit — if current line has content, push it
+    if (currentWidth > 0) {
+      lines.push(currentLine);
+      currentLine = '';
+      currentWidth = 0;
+    }
+
+    // If the token itself is wider than maxCols, break it char-by-char
+    if (tokenWidth > maxCols) {
+      for (const ch of token) {
+        const cw = isFullWidth(ch.codePointAt(0)) ? 2 : 1;
+        if (currentWidth + cw > maxCols) {
+          lines.push(currentLine);
+          currentLine = '';
+          currentWidth = 0;
+        }
+        currentLine += ch;
+        currentWidth += cw;
+      }
     } else {
-      lines.push(current);
-      current = word;
+      currentLine = token;
+      currentWidth = tokenWidth;
     }
   }
-  if (current) lines.push(current);
+
+  if (currentLine) lines.push(currentLine);
   if (lines.length === 0) lines.push('');
   return lines;
 }
@@ -126,12 +213,12 @@ function renderPanelHeader(session, innerWidth, isFocused) {
   const projPart = proj ? `${DIM}${proj}${RESET} ` : '';
   const elapsedPart = ` ${elapsed} `;
 
-  const labelVisible = stripAnsi(label).length;
-  const projVisible = stripAnsi(projPart).length;
-  const elapsedVisible = stripAnsi(elapsedPart).length;
+  const labelVW = visibleWidth(label);
+  const projVW = visibleWidth(projPart);
+  const elapsedVW = displayWidth(elapsedPart);
 
   // Fill remaining width with horizontal lines
-  const fillLen = Math.max(0, innerWidth - labelVisible - projVisible - elapsedVisible);
+  const fillLen = Math.max(0, innerWidth - labelVW - projVW - elapsedVW);
   const fill = hChar.repeat(fillLen);
 
   return `${borderColor}${tlChar}${hChar}${RESET}${label}${borderColor}${hChar}${RESET} ${projPart}${borderColor}${fill}${elapsedPart}${hChar}${trChar}${RESET}`;
@@ -169,13 +256,12 @@ function renderPanelFooter(innerWidth, isFocused) {
 }
 
 /**
- * Render summary lines (AI or rule-based), word-wrapped to 2 lines.
+ * Render summary lines (AI or rule-based), word-wrapped up to 3 lines.
  */
 function renderSummaryLines(summary, innerWidth) {
   if (!summary) return [`${DIM}(no summary)${RESET}`];
   const wrapped = wordWrap(summary, innerWidth);
-  // Limit to 2 lines
-  const lines = wrapped.slice(0, 2).map((line) => `${DIM}${line}${RESET}`);
+  const lines = wrapped.slice(0, 3).map((line) => `${DIM}${line}${RESET}`);
   return lines;
 }
 
@@ -184,10 +270,10 @@ function renderSummaryLines(summary, innerWidth) {
  * @param {Array} recentTools - Array of {toolName, toolSummary, toolDetail, ts}
  * @param {number} innerWidth - Available inner width
  * @param {number} scrollOffset - How many lines to skip from top
- * @param {number} maxLines - Max visible tool lines (default 3)
+ * @param {number} maxLines - Max visible tool lines (default 5)
  */
 function renderToolLines(recentTools, innerWidth, scrollOffset, maxLines) {
-  const visibleLines = maxLines || 3;
+  const visibleLines = maxLines || 5;
   if (!recentTools || recentTools.length === 0) {
     return [`${DIM}  (no tools used)${RESET}`];
   }
@@ -197,9 +283,10 @@ function renderToolLines(recentTools, innerWidth, scrollOffset, maxLines) {
     const elapsedStr = elapsed.padStart(4);
     const prefix = `  \u2022 `;
     const suffix = `  ${elapsedStr}`;
-    const maxToolWidth = innerWidth - prefix.length - suffix.length;
-    const toolText = truncate(`${t.toolName} ${t.toolSummary}`, maxToolWidth);
-    return `${prefix}${toolText}${' '.repeat(Math.max(0, maxToolWidth - toolText.length))}${DIM}${suffix}${RESET}`;
+    const maxToolCols = innerWidth - prefix.length - suffix.length;
+    const toolText = truncate(`${t.toolName} ${t.toolSummary}`, maxToolCols);
+    const toolPad = Math.max(0, maxToolCols - displayWidth(toolText));
+    return `${prefix}${toolText}${' '.repeat(toolPad)}${DIM}${suffix}${RESET}`;
   });
 
   const offset = Math.min(scrollOffset || 0, Math.max(0, allLines.length - visibleLines));
@@ -233,7 +320,7 @@ function renderPanel(session, width, config, isFocused, scrollOffset, summary) {
   // Header (top border with name, project, elapsed)
   lines.push(renderPanelHeader(session, innerWidth, isFocused));
 
-  // Summary lines (2 lines max)
+  // Summary lines (up to 3 lines)
   const summaryLines = renderSummaryLines(summary, innerWidth);
   for (const sl of summaryLines) {
     lines.push(renderPanelLine(sl, innerWidth, isFocused));
@@ -242,8 +329,8 @@ function renderPanel(session, width, config, isFocused, scrollOffset, summary) {
   // Divider
   lines.push(renderPanelDivider(innerWidth, isFocused));
 
-  // Tool history (3 lines)
-  const toolLines = renderToolLines(session.recentTools, innerWidth, scrollOffset, 3);
+  // Tool history (5 lines)
+  const toolLines = renderToolLines(session.recentTools, innerWidth, scrollOffset, 5);
   for (const tl of toolLines) {
     lines.push(renderPanelLine(tl, innerWidth, isFocused));
   }
@@ -307,8 +394,8 @@ function render(sessions, uiState, config, summaries) {
 
       for (const pl of panelLines) {
         // Wrap each panel line inside the outer border
-        const visLen = stripAnsi(pl).length;
-        const rightPad = Math.max(0, cols - visLen - 4);
+        const vw = visibleWidth(pl);
+        const rightPad = Math.max(0, cols - vw - 4);
         lines.push(
           `${CYAN}${BOX.v}${RESET} ${pl}${' '.repeat(rightPad)} ${CYAN}${BOX.v}${RESET}`
         );
@@ -327,7 +414,7 @@ function render(sessions, uiState, config, summaries) {
   // Footer with keybindings
   const aiLabel = config && config.apiKey ? `${GREEN}AI${RESET}` : `${DIM}rules${RESET}`;
   const footer = `  [\u2191\u2193] Focus  [j/k] Scroll  [s] Setup  [q] Quit  [r] Refresh  [c] Clear  ${aiLabel}  `;
-  const footerPadLen = Math.max(0, cols - stripAnsi(footer).length - 2);
+  const footerPadLen = Math.max(0, cols - visibleWidth(footer) - 2);
   lines.push(
     `${CYAN}${BOX.v}${RESET}${DIM}${footer}${RESET}${' '.repeat(footerPadLen)}${CYAN}${BOX.v}${RESET}`
   );
@@ -347,4 +434,4 @@ function draw(sessions, uiState, config, summaries) {
   process.stdout.write(output + '\n');
 }
 
-module.exports = { render, draw, stripAnsi, padEndVisible, wordWrap, formatElapsed, truncate };
+module.exports = { render, draw, stripAnsi, displayWidth, visibleWidth, padEndVisible, wordWrap, formatElapsed, truncate };
