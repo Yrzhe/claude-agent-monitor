@@ -253,11 +253,13 @@ function handleTextInput(key, state, field, nextStep) {
     return { state, result: 'continue' };
   }
 
-  // Printable characters (ignore control chars and escape sequences)
-  if (key.length === 1 && key.charCodeAt(0) >= 32) {
+  // Printable characters — supports both single keystrokes and pasted strings.
+  // In raw mode, pasting sends the entire clipboard as one multi-char data event.
+  const printable = key.split('').filter((ch) => ch.charCodeAt(0) >= 32).join('');
+  if (printable.length > 0) {
     const current = state[field] || '';
     return {
-      state: { ...state, [field]: current + key },
+      state: { ...state, [field]: current + printable },
       result: 'continue',
     };
   }
