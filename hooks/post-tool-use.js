@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 'use strict';
 
-const { readStdin, writeEvent, getAgentName, summarizeTool, detailTool } = require('./lib/shared');
+const { readStdin, writeEvent, getAgentName, summarizeTool, detailTool, briefResult } = require('./lib/shared');
 
 async function main() {
   const input = await readStdin();
@@ -12,7 +12,10 @@ async function main() {
   const { session_id, tool_name, tool_input } = input;
   const name = tool_name || 'unknown';
 
-  writeEvent(session_id, {
+  // Capture tool result if available (PostToolUse hook provides it)
+  const resultBrief = briefResult(input.tool_result || input.tool_response || '');
+
+  const event = {
     ts: new Date().toISOString(),
     event: 'tool_use',
     session_id,
@@ -20,7 +23,13 @@ async function main() {
     tool_name: name,
     tool_summary: summarizeTool(name, tool_input),
     tool_detail: detailTool(name, tool_input),
-  });
+  };
+
+  if (resultBrief) {
+    event.tool_result_brief = resultBrief;
+  }
+
+  writeEvent(session_id, event);
 
   process.exit(0);
 }

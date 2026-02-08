@@ -4,7 +4,7 @@ const https = require('https');
 const http = require('http');
 const url = require('url');
 
-const DEBOUNCE_MS = 30000; // 30 seconds between API calls per session
+const DEBOUNCE_MS = 10000; // 10 seconds between API calls per session
 const REQUEST_TIMEOUT_MS = 10000; // 10 second timeout
 
 /**
@@ -92,7 +92,13 @@ function ruleSummary(session) {
 function buildPrompt(config, session) {
   const tools = (session.recentTools || []).slice(0, 10);
   const toolList = tools
-    .map((t) => `- ${t.toolName}: ${t.toolDetail || t.toolSummary}`)
+    .map((t) => {
+      const base = `- ${t.toolName}: ${t.toolDetail || t.toolSummary}`;
+      if (t.toolResultBrief) {
+        return `${base}\n  Result: ${t.toolResultBrief}`;
+      }
+      return base;
+    })
     .join('\n');
 
   const langInstruction = config.language

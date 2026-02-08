@@ -1,5 +1,6 @@
 'use strict';
 
+const { execSync } = require('child_process');
 const { loadAllSessions, clearEndedSessions } = require('./state');
 const { draw } = require('./renderer');
 const { SessionWatcher } = require('./watcher');
@@ -124,6 +125,23 @@ async function start() {
         case 's':
           openSetup();
           return;
+        case '\r': // Enter — jump to focused session's tmux pane
+        case '\n': {
+          if (sessions.length === 0) return;
+          const focused = sessions[uiState.focusIndex];
+          if (focused && focused.tmuxPane) {
+            try {
+              const safePaneId = focused.tmuxPane.replace(/[^a-zA-Z0-9%_-]/g, '');
+              execSync(`tmux select-pane -t "${safePaneId}"`, {
+                timeout: 2000,
+                stdio: ['pipe', 'pipe', 'pipe'],
+              });
+            } catch {
+              // pane may no longer exist
+            }
+          }
+          return;
+        }
       }
 
       // Arrow keys come as escape sequences

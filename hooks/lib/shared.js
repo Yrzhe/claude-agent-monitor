@@ -175,11 +175,37 @@ function detailTool(toolName, toolInput) {
   }
 }
 
+/**
+ * Extract a brief summary of the tool result (up to 150 chars).
+ * Handles string results and common object shapes.
+ */
+function briefResult(result) {
+  if (!result) return '';
+
+  let text = '';
+  if (typeof result === 'string') {
+    text = result;
+  } else if (typeof result === 'object') {
+    // Some tools return { content: "..." } or { output: "..." }
+    text = result.content || result.output || result.text || JSON.stringify(result);
+  } else {
+    text = String(result);
+  }
+
+  // Collapse whitespace and truncate
+  text = text.replace(/\s+/g, ' ').trim();
+  if (text.length > 150) {
+    return text.slice(0, 147) + '...';
+  }
+  return text;
+}
+
 module.exports = {
   readStdin,
   writeEvent,
   getAgentName,
   summarizeTool,
   detailTool,
+  briefResult,
   getStateDir,
 };

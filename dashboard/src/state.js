@@ -73,6 +73,7 @@ function buildSession(events, maxRecentTools) {
       toolName: e.tool_name || 'unknown',
       toolSummary: e.tool_summary || e.tool_name || 'unknown',
       toolDetail: e.tool_detail || '',
+      toolResultBrief: e.tool_result_brief || '',
       ts: new Date(e.ts).getTime(),
     }));
 
@@ -81,6 +82,8 @@ function buildSession(events, maxRecentTools) {
     name: events[0].agent_name || 'unknown',
     cwd: startEvent ? startEvent.cwd : '',
     model: startEvent ? startEvent.model : 'unknown',
+    tmuxPane: startEvent ? (startEvent.tmux_pane || '') : '',
+    tmuxWindow: startEvent ? (startEvent.tmux_window || '') : '',
     status: deriveStatus(events, now),
     lastTool: lastToolEvent
       ? `${lastToolEvent.tool_name} ${lastToolEvent.tool_summary}`

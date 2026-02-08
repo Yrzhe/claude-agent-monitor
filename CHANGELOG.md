@@ -4,6 +4,20 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/).
 
+## [0.3.0] - 2026-02-08
+
+### Added
+- **Tmux window mapping**: Session-start hook captures `$TMUX_PANE` and window index/name via `tmux display-message`
+- **Window label in panel header**: Shows `[2:work]`-style tmux window identifier next to project name
+- **`[Enter]` keybinding**: Jump to the focused agent's tmux window/pane directly from the dashboard
+- **Tool result capture**: PostToolUse hook now captures truncated `tool_result` (up to 150 chars) for richer AI context
+- **`briefResult()` helper**: New shared utility for extracting concise tool result summaries
+
+### Changed
+- AI summary debounce reduced from 30s to 10s for faster updates
+- AI prompt now includes tool results when available, giving more context for better summaries
+- Footer keybindings updated with `[Enter] Jump` indicator
+
 ## [0.2.1] - 2026-02-08
 
 ### Added
