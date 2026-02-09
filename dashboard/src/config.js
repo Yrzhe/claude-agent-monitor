@@ -31,6 +31,7 @@ const DEFAULTS = {
   notifications: false,
   groupByProject: false,
   archivePath: '',
+  hideSelf: true,
 };
 
 /**
@@ -55,6 +56,7 @@ function loadConfig() {
       notifications: typeof parsed.notifications === 'boolean' ? parsed.notifications : DEFAULTS.notifications,
       groupByProject: typeof parsed.groupByProject === 'boolean' ? parsed.groupByProject : DEFAULTS.groupByProject,
       archivePath: typeof parsed.archivePath === 'string' ? parsed.archivePath : DEFAULTS.archivePath,
+      hideSelf: typeof parsed.hideSelf === 'boolean' ? parsed.hideSelf : DEFAULTS.hideSelf,
     };
   } catch {
     return { ...DEFAULTS };
@@ -78,6 +80,7 @@ function saveConfig(config) {
     notifications: !!config.notifications,
     groupByProject: !!config.groupByProject,
     archivePath: config.archivePath || '',
+    hideSelf: config.hideSelf !== false,
   };
   fs.writeFileSync(CONFIG_PATH, JSON.stringify(data, null, 2) + '\n', 'utf8');
 }

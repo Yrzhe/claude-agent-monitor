@@ -6,6 +6,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/).
 
 ## [Unreleased]
 
+### Fixed
+- **Monitor shows itself** — The dashboard now auto-filters sessions whose `cwd` matches the monitor's own project directory, preventing the Claude Code session used to develop/interact with the monitor from appearing as a phantom agent. Controlled by `hideSelf` config option (default `true`); set to `false` in config.json to disable.
+
 ### Added
 - **Real-time session archive**: All session events (tool calls, conversations, summaries, topics) are saved as permanent JSONL files in a user-configured archive directory. Hook scripts write tool_use, session_start, stop, and session_end events in real-time; dashboard syncs conversation messages and AI summaries periodically. Archive files organized as `<archivePath>/YYYY/MM/YYYY-MM-DD-<sessionId>.jsonl`. Cross-midnight sessions handled via `archive-map.json` mapping file. Configure archive path via `[s]` setup wizard.
 - **AI topic summary**: Generates a concise session topic title by sampling conversation messages from beginning, middle, and end (user queries + assistant responses + recent tools), displayed prominently with magenta `▸` prefix in both TUI and web dashboard — instantly see what each agent is working on instead of just a random codename. Falls back to first user message when no API key is configured.

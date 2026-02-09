@@ -79,13 +79,30 @@ async function start() {
     refresh();
   }
 
+  // Resolve the monitor project root so we can filter out "self" sessions
+  const monitorProjectRoot = path.resolve(__dirname, '..', '..');
+
   /**
    * Refresh: load sessions and redraw.
    */
   function refresh() {
     if (inSetup) return; // Don't redraw dashboard while in setup
 
-    const allSessions = loadAllSessions(config);
+    let allSessions = loadAllSessions(config);
+
+    // Filter out sessions whose cwd matches the monitor's own project directory.
+    // This prevents the monitor from showing "itself" (the Claude Code session
+    // used to develop or interact with the monitor). Controlled by hideSelf config.
+    if (config.hideSelf !== false) {
+      allSessions = allSessions.filter((s) => {
+        if (!s.cwd) return true;
+        try {
+          return path.resolve(s.cwd) !== monitorProjectRoot;
+        } catch {
+          return true;
+        }
+      });
+    }
 
     // Detect transitions for notifications before updating currentSessions
     if (uiState.notifications && previousSessions.length > 0) {
