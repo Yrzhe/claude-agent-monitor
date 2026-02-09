@@ -9,10 +9,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/).
 ### Added
 - **Real-time session archive**: All session events (tool calls, conversations, summaries, topics) are saved as permanent JSONL files in a user-configured archive directory. Hook scripts write tool_use, session_start, stop, and session_end events in real-time; dashboard syncs conversation messages and AI summaries periodically. Archive files organized as `<archivePath>/YYYY/MM/YYYY-MM-DD-<sessionId>.jsonl`. Cross-midnight sessions handled via `archive-map.json` mapping file. Configure archive path via `[s]` setup wizard.
 - **AI topic summary**: Generates a concise session topic title by sampling conversation messages from beginning, middle, and end (user queries + assistant responses + recent tools), displayed prominently with magenta `▸` prefix in both TUI and web dashboard — instantly see what each agent is working on instead of just a random codename. Falls back to first user message when no API key is configured.
+- **Enhanced notifications**: New tool activity and new conversation message notifications in addition to existing status transition notifications. Toggle `[n]` now shows descriptive status message.
+- **Export feedback**: `[e]` export now shows a visible green status message on the dashboard with the exported filename (or error details), instead of the invisible terminal title change.
 
 ### Fixed
 - **Critical: hooks never fire** — All hook matchers used `""` (empty string) which matches nothing; changed to `"*"` (wildcard) so hooks actually trigger. Affected `hooks/hooks.json`, `.claude-plugin/plugin.json`, and README manual setup instructions.
 - **Critical: archive never writes** — `archivePath` with wrapping quotes (e.g. pasted from terminal as `'/path/to/dir'`) was treated as a relative path, causing all archive writes to silently fail. Fixed in both `archiver.js` (strips wrapping quotes on read) and `setup.js` (strips quotes before saving).
+- **Session disappears on new window** — Ghost session filter removed sessions with `toolCount === 0` and non-active status immediately. Now keeps sessions visible for 30 minutes even without tool activity, preventing newly opened sessions from vanishing.
+- **AI summary stuck on old content** — Summary cache was only invalidated by `toolCount` changes. Now also checks `messageCount`, so new conversation messages (even without tool calls) trigger re-summarization.
+- **J/K scroll not working** — `maxScroll` was calculated from `recentTools.length` only, but the rendered timeline includes both tools and conversation messages. Fixed to use full timeline length and accounts for expanded mode (10 visible lines vs 5).
 
 ## [0.5.0] - 2026-02-09
 

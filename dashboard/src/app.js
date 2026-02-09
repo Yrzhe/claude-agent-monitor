@@ -11,6 +11,7 @@ const { runSetup } = require('./setup');
 const { notify, detectTransitions } = require('./notifier');
 const { saveExport } = require('./exporter');
 const { ArchiveSyncer } = require('./archive-sync');
+const { buildTimeline } = require('./timeline');
 
 /**
  * Start the dashboard application.
@@ -49,6 +50,8 @@ async function start() {
     expandedPanels: new Set(), // sessionIds with expanded tool details
     notifications: config.notifications || false,
     groupByProject: config.groupByProject || false,
+    statusMessage: '',      // Temporary status message shown in footer
+    statusMessageTimer: null,
   };
 
   // Cached sessions for re-render
@@ -61,6 +64,20 @@ async function start() {
   // Web server child process
   let webProcess = null;
   const webPort = 3210;
+
+  /**
+   * Show a temporary status message for a few seconds.
+   */
+  function showStatus(msg, durationMs) {
+    uiState.statusMessage = msg;
+    if (uiState.statusMessageTimer) clearTimeout(uiState.statusMessageTimer);
+    uiState.statusMessageTimer = setTimeout(() => {
+      uiState.statusMessage = '';
+      uiState.statusMessageTimer = null;
+      refresh();
+    }, durationMs || 3000);
+    refresh();
+  }
 
   /**
    * Refresh: load sessions and redraw.
@@ -81,6 +98,10 @@ async function start() {
           notify('Agent Idle', `${name} is waiting for input`);
         } else if (t.type === 'became_stale') {
           notify('Agent Stale', `${name} has been unresponsive for 5+ minutes`);
+        } else if (t.type === 'new_tool_activity') {
+          notify('Agent Active', `${name} used ${t.detail || 'a tool'}`);
+        } else if (t.type === 'new_messages') {
+          notify('New Message', `${name} has new conversation activity`);
         }
       }
     }
@@ -121,8 +142,12 @@ async function start() {
       }
     }
 
-    // Pass expandedPanels to renderer via config (avoids changing render() signature)
-    const renderConfig = { ...config, _expandedPanels: uiState.expandedPanels };
+    // Pass expandedPanels and status message to renderer via config
+    const renderConfig = {
+      ...config,
+      _expandedPanels: uiState.expandedPanels,
+      _statusMessage: uiState.statusMessage || '',
+    };
     draw(currentSessions, uiState, renderConfig, summaries, topics);
   }
 
@@ -186,7 +211,8 @@ async function start() {
           uiState.notifications = !uiState.notifications;
           config.notifications = uiState.notifications;
           saveConfig(config);
-          refresh();
+          const notifyStatus = uiState.notifications ? 'ON' : 'OFF';
+          showStatus(`Notifications ${notifyStatus} (status changes, tool activity, new messages)`, 3000);
           return;
         }
         case 'f': {
@@ -218,10 +244,9 @@ async function start() {
           const summary = summaryManager.getSummary(focusedSession);
           try {
             const exportPath = saveExport(focusedSession, 'md', summary);
-            // Brief notification via terminal title
-            process.stdout.write(`\x1b]0;Exported to ${path.basename(exportPath)}\x07`);
-          } catch {
-            // Export failed — non-critical
+            showStatus(`Exported to ${path.basename(exportPath)}`, 4000);
+          } catch (err) {
+            showStatus(`Export failed: ${err.message || 'unknown error'}`, 4000);
           }
           return;
         }
@@ -290,19 +315,28 @@ async function start() {
       }
 
       if (key === 'j' || key === 'k') {
-        // j/k — scroll tool history within focused panel
+        // j/k — scroll timeline (tools + messages) within focused panel
         if (sessions.length === 0) return;
         const focused = sessions[uiState.focusIndex];
         if (!focused) return;
         const id = focused.id;
         const current = uiState.scrollOffsets[id] || 0;
-        const maxScroll = Math.max(0, (focused.recentTools || []).length - 3);
+
+        // Calculate from full timeline length, not just recentTools
+        const timeline = buildTimeline(focused.recentTools || [], focused.conversation || []);
+        const isExpanded = uiState.expandedPanels.has(id);
+        // In expanded mode, each tool entry can produce 2 lines (name + detail)
+        const totalLines = isExpanded
+          ? timeline.reduce((acc, e) => acc + (e.type === 'tool' && (e.toolDetail || e.toolResultBrief) ? 2 : 1), 0)
+          : timeline.length;
+        const visibleLines = isExpanded ? 10 : 5;
+        const maxScroll = Math.max(0, totalLines - visibleLines);
 
         if (key === 'j') {
-          // Scroll down (show older tools)
+          // Scroll down (show older entries)
           uiState.scrollOffsets[id] = Math.min(current + 1, maxScroll);
         } else {
-          // Scroll up (show newer tools)
+          // Scroll up (show newer entries)
           uiState.scrollOffsets[id] = Math.max(current - 1, 0);
         }
         refresh();
@@ -314,6 +348,7 @@ async function start() {
   function cleanup() {
     watcher.stop();
     clearInterval(autoRefreshTimer);
+    if (uiState.statusMessageTimer) clearTimeout(uiState.statusMessageTimer);
     process.stdout.removeAllListeners('resize');
     if (webProcess) {
       webProcess.kill();

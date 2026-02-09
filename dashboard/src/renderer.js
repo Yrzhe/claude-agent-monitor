@@ -603,6 +603,14 @@ function render(sessions, uiState, config, summaries, topics) {
   // Empty line
   lines.push(`${CYAN}${BOX.v}${RESET}${' '.repeat(cols - 2)}${CYAN}${BOX.v}${RESET}`);
 
+  // Status message (temporary feedback for export, etc.)
+  const statusMsg = config && config._statusMessage;
+  if (statusMsg) {
+    const statusText = `  ${GREEN}${BOLD}${statusMsg}${RESET}`;
+    const statusPadLen = Math.max(0, cols - visibleWidth(statusText) - 4);
+    lines.push(`${CYAN}${BOX.v}${RESET}${statusText}${' '.repeat(statusPadLen)}  ${CYAN}${BOX.v}${RESET}`);
+  }
+
   // Footer with keybindings
   const aiLabel = config && config.apiKey ? `${GREEN}AI${RESET}` : `${DIM}rules${RESET}`;
   const notifyLabel = ui.notifications ? `${GREEN}ON${RESET}` : `${DIM}off${RESET}`;

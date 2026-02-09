@@ -32,7 +32,9 @@ function notify(title, message) {
  * Detectable transitions:
  * - session_end: A session that was active/idle is now ended
  * - became_idle: A session that was active is now idle (agent stopped responding)
- * - error: A session encountered an error (reserved for future)
+ * - became_stale: A session that was active is now stale (5+ min unresponsive)
+ * - new_tool_activity: A session gained new tool usage
+ * - new_messages: A session has new conversation messages
  *
  * @param {Array} prev - Previous sessions array.
  * @param {Array} current - Current sessions array.
@@ -67,6 +69,19 @@ function detectTransitions(prev, current) {
     // Active → stale (agent unresponsive)
     if (old.status === 'active' && cur.status === 'stale') {
       transitions.push({ type: 'became_stale', session: cur });
+    }
+
+    // New tool activity (toolCount increased)
+    if (cur.toolCount > old.toolCount) {
+      const lastTool = (cur.recentTools && cur.recentTools[0])
+        ? cur.recentTools[0].toolName
+        : 'tool';
+      transitions.push({ type: 'new_tool_activity', session: cur, detail: lastTool });
+    }
+
+    // New conversation messages (messageCount increased)
+    if ((cur.messageCount || 0) > (old.messageCount || 0)) {
+      transitions.push({ type: 'new_messages', session: cur });
     }
   }
 

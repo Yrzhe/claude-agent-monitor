@@ -393,8 +393,10 @@ class SummaryManager {
     const cached = this._cache[id];
     const now = Date.now();
 
-    // Return cached if still valid
-    if (cached && cached.toolCount === session.toolCount) {
+    const msgCount = session.messageCount || 0;
+
+    // Return cached if both toolCount and messageCount unchanged
+    if (cached && cached.toolCount === session.toolCount && cached.msgCount === msgCount) {
       return cached.text;
     }
 
@@ -492,6 +494,7 @@ class SummaryManager {
     const id = session.id;
     this._pending.add(id);
 
+    const sessionMsgCount = session.messageCount || 0;
     callApi(this._config, session)
       .then((text) => {
         this._pending.delete(id);
@@ -499,6 +502,7 @@ class SummaryManager {
           this._cache[id] = {
             text,
             toolCount: session.toolCount,
+            msgCount: sessionMsgCount,
             ts: Date.now(),
           };
         } else {
@@ -506,6 +510,7 @@ class SummaryManager {
           this._cache[id] = {
             text: ruleSummary(session),
             toolCount: session.toolCount,
+            msgCount: sessionMsgCount,
             ts: Date.now(),
           };
         }
@@ -516,6 +521,7 @@ class SummaryManager {
         this._cache[id] = {
           text: ruleSummary(session),
           toolCount: session.toolCount,
+          msgCount: sessionMsgCount,
           ts: Date.now(),
         };
         if (this.onUpdate) this.onUpdate();

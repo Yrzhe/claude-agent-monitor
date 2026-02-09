@@ -128,8 +128,15 @@ function loadAllSessions(config) {
       return buildSession(events, maxRecentTools);
     })
     .filter(Boolean)
-    // Hide ghost sessions: stale/ended with zero tool events
-    .filter((s) => s.toolCount > 0 || s.status === 'active' || s.status === 'idle')
+    // Hide ghost sessions: only remove sessions that are stale/ended with zero
+    // tool events AND older than 30 minutes. Recent sessions stay visible even
+    // without tool activity so they don't "disappear" from the dashboard.
+    .filter((s) => {
+      if (s.toolCount > 0) return true;
+      if (s.status === 'active' || s.status === 'idle') return true;
+      const ageMs = Date.now() - s.lastEventAt;
+      return ageMs < 30 * 60 * 1000;
+    })
     .sort((a, b) => b.lastEventAt - a.lastEventAt);
 }
 
